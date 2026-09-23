@@ -272,6 +272,18 @@
     color:#fff;background:var(--pitch-light);
     border-radius:4px;padding:0 2px;
   }
+  /* Segno aggiuntivo (non solo colore) per "da confermare": un anello attorno
+     all'icona, non un puntino nell'angolo. Prima versione (puntino ::after, stessa
+     tecnica di .notif-dot/.backup-dot) verificata via screenshot a schermo intero
+     a 20px/16px: il colore si leggeva bene, il puntino no (poco più di un neo
+     accanto all'icona, specialmente a 16px con 2 icone nella stessa cella).
+     box-shadow (non border, che aggiungerebbe spazio nel box) disegna un anello
+     pulito attorno all'intera icona: una forma grande quanto l'icona stessa,
+     non un dettaglio da 7px in un angolo — più leggibile alla dimensione reale. */
+  .cal-cell .dots .ev-emoji.da-confermare{
+    box-shadow:0 0 0 2px var(--gold);
+    border-radius:50%;
+  }
   /* torta compleanno: rimpicciolita e spinta nell'angolo vero, per non
      sovrapporsi al numero del giorno (centrato) nei giorni a due cifre */
   .cal-cell .cake{position:absolute;top:0;right:0;font-size:10px;}
@@ -538,6 +550,11 @@
   }
 
   .warn-tri{color:var(--gold);font-size:15px;cursor:pointer;flex-shrink:0;}
+  /* Impegno "da confermare" (presenze/convocati non ancora rivisti dopo la creazione):
+     stesso colore --gold già usato per attenzione (.warn-tri, .notif-dot), non uno stato di
+     presenza (verde/arancio/rosso/viola restano quelli). Regola generica: usata sia sulle
+     icone del calendario sia su quelle di modalDay/modalEventDetail. */
+  .da-confermare{color:var(--gold);}
   .collapsible-section{
     overflow:hidden;
     max-height:0;
@@ -770,6 +787,18 @@ const ICONS = {
   sync: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 13.66-5.66L20 8"/><path d="M20 4v4h-4"/><path d="M20 12a8 8 0 0 1-13.66 5.66L4 16"/><path d="M4 20v-4h4"/></svg>',
   calendarToday: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/><circle cx="12" cy="15.5" r="2.2"/></svg>',
   trash: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>',
+  // Sostituiscono ★/☆/🔔/✏️/📲/✕: stesso stile monocromo a stroke="currentColor"
+  // delle altre icone, tranne starFilled (vedi sotto).
+  starOutline: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>',
+  // colori fissi (non currentColor): serve un contorno scuro OLTRE al riempimento
+  // oro, e un solo "color" CSS non basta per due tinte. #5C3D0E è lo stesso
+  // marrone caldo già usato letteralmente in styles.css (banner, badge ritardo,
+  // nota della scheda stampata), qui non ancora un token — coerente con quello.
+  starFilled: '<svg viewBox="0 0 24 24" width="1em" height="1em"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26" fill="#F0A400" stroke="#5C3D0E" stroke-width="1.1" stroke-linejoin="round"/></svg>',
+  bell: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16c0-1 .4-1.8 1-2.4.6-.7 1-1.6 1-2.6V8a4 4 0 0 1 8 0v3c0 1 .4 1.9 1 2.6.6.6 1 1.4 1 2.4Z"/><line x1="6" y1="16" x2="18" y2="16"/><path d="M10.5 19a1.5 1.5 0 0 0 3 0"/></svg>',
+  pencil: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l.8-3.6L15.6 5.6a1 1 0 0 1 1.4 0l1.4 1.4a1 1 0 0 1 0 1.4L7.6 19.2 4 20Z"/><line x1="13.8" y1="7.4" x2="16.6" y2="10.2"/></svg>',
+  phone: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="7" y1="17.5" x2="17" y2="17.5"/></svg>',
+  close: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>',
 };
 function icon(name){ return ICONS[name] || ''; }
 function fabHtml(action, label, extraAttrs){
@@ -927,9 +956,11 @@ function infoIcon(key){
 // close-popup): stesso markup, cambia solo l'azione dei due pulsanti di chiusura.
 function infoPanelHtml(info, closeAction){
   return `
-    <div class="modal-head"><h2>${info.title}</h2><button data-action="${closeAction}">✕</button></div>
-    <div class="info-body">${info.body}</div>
-    <button class="btn block" style="margin-top:14px;" data-action="${closeAction}">Ho capito</button>
+    <div class="modal-head"><h2>${info.title}</h2><button data-action="${closeAction}">${icon('close')}</button></div>
+    <div class="modal-scroll-body">
+      <div class="info-body">${info.body}</div>
+      <button class="btn block" style="margin-top:14px;" data-action="${closeAction}">Ho capito</button>
+    </div>
   `;
 }
 function modalInfo(){
@@ -968,7 +999,7 @@ const MINUTI_OPZIONI = [['','—'], ...['00','05','10','15','20','25','30','35',
    una versione più recente: i suoi dati vengono aggiornati al
    volo, in automatico, la prima volta che vengono caricati.
    ========================================================= */
-const CURRENT_SCHEMA_VERSION = 2;
+const CURRENT_SCHEMA_VERSION = 3;
 window.CURRENT_SCHEMA_VERSION = CURRENT_SCHEMA_VERSION;
 
 /* ---- Liste dei dati: cosa deve avere un file di backup per essere accettato ----
@@ -1047,6 +1078,19 @@ function migrateState(data){
     });
     data.tournaments = tournaments;
     v = 2;
+  }
+
+  // v2 -> v3: nuovo campo "confermato" sugli impegni (segnale "da confermare" nel
+  // calendario: colore diverso sull'icona finché il mister non riapre e salva le presenze/
+  // i convocati). Tutti gli impegni già esistenti (dispositivo o backup importati) risultano
+  // confermati: il segnale riguarda solo gli impegni creati DOPO questa versione.
+  if(v < 3){
+    events.forEach(e=>{
+      if(!e || typeof e!=='object') return;
+      if(e.confermato===undefined) e.confermato = true;
+    });
+    data.events = events;
+    v = 3;
   }
 
   data.meta = data.meta || {};
@@ -1646,6 +1690,13 @@ function deleteTournamentData(tid){
   if(UI.statsTournamentFilter===tid){ UI.statsTournamentFilter=''; }
   saveState();
 }
+// Unico punto che crea o modifica un impegno: chiamata da 4 rami del submit in events.js
+// (generale/allenamento/partita/raggruppamento), sempre con l'intero form già letto. Non
+// esiste oggi un percorso che aggiorni solo alcuni campi di un impegno esistente (es. solo
+// l'orario, senza la sezione presenze/convocati per i tre tipi che ce l'hanno): il campo
+// "confermato" (allenamento/partita/raggruppamento) si appoggia proprio su questo, vedi il
+// commento nel ramo 'allenamento' del submit. Se in futuro si aggiunge un percorso di
+// modifica parziale, quel presupposto va riverificato.
 function upsertEvent(eventId, teamId, date, type, data){
   const typeLabel = EVENT_LABEL[type] || 'Impegno';
   if(eventId){
@@ -1676,13 +1727,33 @@ function render(){
   syncHistory();   // solo history.pushState/go: mai un render, vedi "CRONOLOGIA E TASTO INDIETRO"
 }
 
+// "Standalone" = l'app è già installata/aggiunta alla Home. Due segnali indipendenti:
+// (a) lo standard display-mode (Chrome/Edge/Android; Safari recenti se c'è un manifest
+//     valido — qui vale solo per la versione ospitata in dist/, non per app.html aperto
+//     come file locale, che non ha un manifest raggiungibile);
+// (b) navigator.standalone, il segnale storico di iOS per "Aggiungi a Home" — resta
+//     necessario proprio per il caso "file locale senza manifest" su iPhone/iPad.
+// Avvolta in try/catch: window.matchMedia non esiste in ogni ambiente (jsdom, i nostri
+// test, non lo implementa) e non deve mai far fallire renderTopbar()/render(). Nessun
+// listener di cambio: la modalità standalone non cambia a sessione di pagina aperta.
+function isStandaloneMode(){
+  try{
+    if(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
+  }catch(e){}
+  try{
+    if(window.navigator && window.navigator.standalone === true) return true;
+  }catch(e){}
+  return false;
+}
+
 function renderTopbar(){
   const el = document.getElementById('topbar');
   const notifBadge = hasUnseenReminders() ? '<span class="notif-dot"></span>' : '';
   // promemoria backup: puntino chiaro sull'icona del backup (id fisso: dopo un export
   // lo si nasconde direttamente nel DOM, senza render(), vedi hideBackupReminderUI)
   const backupBadge = backupReminder() ? '<span class="backup-dot" id="backup-dot"></span>' : '';
-  const installBackup = `<button class="icon-btn" data-action="show-info" data-infokey="installa" title="Come installare l'app">📲</button><button class="icon-btn" data-action="open-notifiche" title="Notifiche">🔔${notifBadge}</button><button class="icon-btn" data-action="open-backup" title="Backup e ripristino">${icon('sync')}${backupBadge}</button>`;
+  const installBtn = isStandaloneMode() ? '' : `<button class="icon-btn" data-action="show-info" data-infokey="installa" title="Come installare l'app">${icon('phone')}</button>`;
+  const installBackup = `${installBtn}<button class="icon-btn" data-action="open-notifiche" title="Notifiche">${icon('bell')}${notifBadge}</button><button class="icon-btn" data-action="open-backup" title="Backup e ripristino">${icon('sync')}${backupBadge}</button>`;
 
   if(UI.screen==='team' && currentTeam()){
     const team = currentTeam();
@@ -1724,7 +1795,7 @@ function renderBanner(){
   if(bdays.length===0){ zone.innerHTML=''; return; }
   const names = bdays.map(r=>displayName(r.player)).join(', ');
   zone.innerHTML = `<div class="banner">🎂 Oggi è il compleanno di <strong>&nbsp;${escapeHtml(names)}</strong>!
-    <button class="close" data-action="dismiss-banner">✕</button></div>`;
+    <button class="close" data-action="dismiss-banner">${icon('close')}</button></div>`;
 }
 
 function renderBottomnav(){
@@ -1800,7 +1871,7 @@ function renderHomeDashboard(){
         <div class="section-title" style="margin-bottom:2px;">${greetingLine()}</div>
         <div class="muted">🕓 Dati aggiornati il: ${escapeHtml(updatedLabel)}</div>
       </div>
-      <button class="btn ghost sm" data-action="open-set-name" title="Cambia nome">✏️</button>
+      <button class="btn ghost sm" data-action="open-set-name" title="Cambia nome">${icon('pencil')}</button>
     </div>
 
     <div class="tile-grid">
@@ -1860,7 +1931,7 @@ function renderSeasonTeamsScreen(){
         const isPrimary = t.id===STATE.primaryTeamId;
         return `
         <div class="list-item">
-          <button type="button" class="star-toggle" data-action="toggle-primary-team" data-tid="${t.id}" title="${isPrimary?'Squadra principale':'Rendi squadra principale'}">${isPrimary?'★':'☆'}</button>
+          <button type="button" class="star-toggle" data-action="toggle-primary-team" data-tid="${t.id}" data-star="${isPrimary?'filled':'empty'}" title="${isPrimary?'Squadra principale':'Rendi squadra principale'}">${isPrimary?icon('starFilled'):icon('starOutline')}</button>
           <div class="row-click-target" data-action="enter-team" data-tid="${t.id}">
             <div class="avatar avatar-icon" style="background:var(--pitch-deep);color:#fff;">${icon('users')}</div>
             <div class="name-stack">
@@ -2522,7 +2593,8 @@ function modalBackup(){
   const rem = backupReminder();
   const reminderLine = rem ? `<div class="banner" id="backup-reminder-line" style="margin:0 0 14px;">💾 ${escapeHtml(backupReminderText(rem))}</div>` : '';
   return `
-    <div class="modal-head"><h2>Backup e ripristino</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Backup e ripristino</h2><button data-action="close-modal">${icon('close')}</button></div>
+    <div class="modal-scroll-body">
     <p class="muted">I dati della squadra sono salvati solo su questo telefono, dentro l'app. Il backup ti permette di tenerli al sicuro o di trasferirli su un nuovo telefono. Attenzione: se cancelli i dati del browser (in particolare "cookie e dati dei siti"), possono sparire anche i dati dell'app. Prima di pulire il telefono o il browser, fai un backup.</p>
     <div class="banner" style="margin:0 0 14px;">🕓 Dati di questo dispositivo aggiornati il: <strong>&nbsp;${escapeHtml(updatedLabel)}</strong>${lastActionLabel? `<br><span style="font-size:13px;font-weight:400;">Ultima azione: ${escapeHtml(lastActionLabel)}</span>`:''}</div>
     ${reminderLine}
@@ -2534,6 +2606,7 @@ function modalBackup(){
       <input type="file" accept="application/json" data-action="import-backup-file" style="display:none;">
     </label>
     <p class="muted">⚠️ Importare un backup sostituisce tutti i dati presenti ora su questo dispositivo. Prima di procedere l'app ti mostra cosa c'è nel backup e cosa c'è sul telefono, e ti segnala se il backup è più vecchio.</p>
+    </div>
   `;
 }
 
@@ -2807,7 +2880,14 @@ function renderCalendarView(team){
     });
     const ordineTipi = ['allenamento','partita','raggruppamento','generale'];
     const conteggioPerTipo = {};
-    evs.forEach(e => { conteggioPerTipo[e.type] = (conteggioPerTipo[e.type]||0) + 1; });
+    // "da confermare" per tipo: almeno un impegno di quel tipo, in quel giorno, non ancora
+    // confermato (presenze/convocati da rivedere). 'generale' non ha mai il segnale: non ha
+    // una sezione presenze da confermare (vedi il submit in events.js).
+    const daConfermarePerTipo = {};
+    evs.forEach(e => {
+      conteggioPerTipo[e.type] = (conteggioPerTipo[e.type]||0) + 1;
+      if(e.type!=='generale' && e.confermato===false) daConfermarePerTipo[e.type] = true;
+    });
     // Al massimo 2 icone piene per giorno (restano leggibili): i tipi oltre
     // il secondo si riassumono in un badge "+N", invece di rimpicciolire
     // tutto fino all'illeggibile nei giorni con 3-4 tipi di impegno diversi.
@@ -2820,7 +2900,8 @@ function renderCalendarView(team){
         const isLast = i===shownTypes.length-1;
         const countHtml = n>1 ? `<span class="ev-count">×${n}</span>` : '';
         const moreHtml = (isLast && hiddenTypesCount>0) ? `<span class="more-badge">+${hiddenTypesCount}</span>` : '';
-        return `<span class="ev-emoji">${EVENT_ICON[t]}${countHtml}${moreHtml}</span>`;
+        const daConfermareClass = daConfermarePerTipo[t] ? ' da-confermare' : '';
+        return `<span class="ev-emoji${daConfermareClass}">${EVENT_ICON[t]}${countHtml}${moreHtml}</span>`;
       }).join('');
     const isWeekend = idx%7===5 || idx%7===6;
     const classes = ['cal-cell'];
@@ -2888,7 +2969,7 @@ function modalJumpMonth(){
   const base = new Date().getFullYear();
   for(let yy=base-10; yy<=base+10; yy++) yearsRange.push(yy);
   return `
-    <div class="modal-head"><h2>Vai al mese</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Vai al mese</h2><button data-action="close-modal">${icon('close')}</button></div>
     <div class="modal-scroll-body" style="padding-top:6px;">
     <form data-form="jump-month">
       <div class="row2" style="margin-bottom:24px;">
@@ -2914,7 +2995,7 @@ function modalJumpMonth(){
 function modalSetName(){
   const isFirstRun = !STATE.userName;
   return `
-    <div class="modal-head"><h2>${isFirstRun? 'Benvenuto! Come ti chiamiamo?' : 'Cambia nome'}</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>${isFirstRun? 'Benvenuto! Come ti chiamiamo?' : 'Cambia nome'}</h2><button data-action="close-modal">${icon('close')}</button></div>
     ${isFirstRun? `<p class="muted">Lo useremo per salutarti quando apri l'app. Puoi cambiarlo quando vuoi dalla Home.</p>`:''}
     <form data-form="set-name">
       <div class="field"><label>Nome o nickname</label>
@@ -2930,7 +3011,7 @@ function modalSetName(){
 
 function modalInfoTip(){
   return `
-    <div class="modal-head"><h2>Un consiglio prima di iniziare</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Un consiglio prima di iniziare</h2><button data-action="close-modal">${icon('close')}</button></div>
     <p>Se in un punto dell'app non è chiaro cosa fare, cerca le icone <span class="info-icon" style="pointer-events:none;vertical-align:middle;">i</span> sparse per le varie schermate: toccale per leggere una spiegazione chiara di quella funzione specifica.</p>
     <p class="muted">Puoi tornare a leggerle quando vuoi, non serve ricordarle a memoria.</p>
     <button type="button" class="btn block" data-action="close-modal">Ho capito, iniziamo</button>
@@ -3026,7 +3107,7 @@ function modalPlayerAndamento(){
   const summary = andamentoSummaryHtml(player, team, tab);
 
   return `
-    <div class="modal-head"><h2 style="position:relative;top:-8px;">${escapeHtml(displayName(player))}</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2 style="position:relative;top:-8px;">${escapeHtml(displayName(player))}</h2><button data-action="close-modal">${icon('close')}</button></div>
     <div class="modal-scroll-body">
       <p class="muted" style="margin-bottom:12px;">${escapeHtml(team.nome)}</p>
       <div id="andamento-summary" style="margin-bottom:14px;">${summary}</div>
@@ -3047,7 +3128,8 @@ function modalPlayerAndamento(){
    ========================================================= */
 function modalSeasonManager(){
   return `
-    <div class="modal-head"><h2>Stagioni</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Stagioni</h2><button data-action="close-modal">${icon('close')}</button></div>
+    <div class="modal-scroll-body">
     ${STATE.seasons.map(s=>`
       <div class="list-item">
         <div class="name" style="flex:1;">${escapeHtml(s.nome)}</div>
@@ -3061,6 +3143,7 @@ function modalSeasonManager(){
       </div>
       <button type="submit" class="btn block">Crea stagione</button>
     </form>
+    </div>
   `;
 }
 
@@ -3072,7 +3155,8 @@ function modalTeamManager(){
   const season = getSeason(seasonId);
   const teams = season ? teamsOfSeason(season.id) : [];
   return `
-    <div class="modal-head"><h2>Squadre — ${season?escapeHtml(season.nome):''}</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Squadre — ${season?escapeHtml(season.nome):''}</h2><button data-action="close-modal">${icon('close')}</button></div>
+    <div class="modal-scroll-body">
     ${teams.map(t=>`
       <div class="list-item">
         <div class="name" style="flex:1;">${escapeHtml(t.nome)}</div>
@@ -3088,6 +3172,7 @@ function modalTeamManager(){
       </div>
       <button type="submit" class="btn block">Crea squadra</button>
     </form>` : '<p class="muted">Crea prima una stagione.</p>'}
+    </div>
   `;
 }
 
@@ -3098,7 +3183,7 @@ function modalEditSeason(){
   const s = getSeason(UI.modal.payload.sid);
   if(!s) return '';
   return `
-    <div class="modal-head"><h2>Rinomina stagione</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Rinomina stagione</h2><button data-action="close-modal">${icon('close')}</button></div>
     <form data-form="rename-season" data-sid="${s.id}">
       <div class="field"><label>Nome stagione</label>
         <input type="text" name="nome" value="${escapeHtml(s.nome)}" required>
@@ -3112,7 +3197,7 @@ function modalConfirmDeleteSeason(){
   if(!s) return '';
   const teams = teamsOfSeason(s.id);
   return `
-    <div class="modal-head"><h2>Eliminare la stagione?</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Eliminare la stagione?</h2><button data-action="close-modal">${icon('close')}</button></div>
     <p>Stai per eliminare la stagione <strong>${escapeHtml(s.nome)}</strong>${teams.length? ` insieme a tutte le sue ${teams.length} squadre (calendario, presenze, partite comprese)`:''}. Questa azione non si può annullare.</p>
     <p class="muted">I giocatori restano nell'anagrafica generale; solo il loro legame con queste squadre viene rimosso.</p>
     <div style="display:flex;gap:8px;margin-top:14px;">
@@ -3125,7 +3210,7 @@ function modalEditTeam(){
   const t = getTeam(UI.modal.payload.tid);
   if(!t) return '';
   return `
-    <div class="modal-head"><h2>Rinomina squadra</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Rinomina squadra</h2><button data-action="close-modal">${icon('close')}</button></div>
     <form data-form="rename-team" data-tid="${t.id}">
       <div class="field"><label>Nome squadra</label>
         <input type="text" name="nome" value="${escapeHtml(t.nome)}" required>
@@ -3140,7 +3225,7 @@ function modalConfirmDeleteTeam(){
   if(!t) return '';
   const n = rosterAt(t.id,null).length;
   return `
-    <div class="modal-head"><h2>Eliminare la squadra?</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Eliminare la squadra?</h2><button data-action="close-modal">${icon('close')}</button></div>
     <p>Stai per eliminare <strong>${escapeHtml(t.nome)}</strong>: calendario, presenze e partite di questa squadra andranno persi. ${n? `${n} giocatori verranno scollegati (restano nell'anagrafica generale).`:''} Questa azione non si può annullare.</p>
     <div style="display:flex;gap:8px;margin-top:14px;">
       <button class="btn secondary" style="flex:1;" data-action="close-modal">Annulla</button>
@@ -3157,7 +3242,8 @@ function modalEditPlayer(){
   const pl = pid ? getPlayer(pid) : null;
   const forTeam = UI.modal.payload.forTeam;
   return `
-    <div class="modal-head"><h2>${pl?'Modifica giocatore':'Nuovo giocatore'}</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>${pl?'Modifica giocatore':'Nuovo giocatore'}</h2><button data-action="close-modal">${icon('close')}</button></div>
+    <div class="modal-scroll-body">
     <form data-form="save-player" data-pid="${pid||''}" data-forteam="${forTeam?'1':''}">
       <div class="row2">
         <div class="field"><label>Nome</label><input type="text" name="nome" value="${pl?escapeHtml(pl.nome):''}" required></div>
@@ -3171,6 +3257,7 @@ function modalEditPlayer(){
       </div>
       <button type="submit" class="btn block">Salva</button>
     </form>
+    </div>
   `;
 }
 
@@ -3207,7 +3294,7 @@ function addExistingPlayerListHtml(available){
 function modalAddExistingPlayer(){
   const available = addExistingPlayerFiltered();
   return `
-    <div class="modal-head"><h2>Aggiungi giocatore esistente</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Aggiungi giocatore esistente</h2><button data-action="close-modal">${icon('close')}</button></div>
     <div class="modal-scroll-body">
       <div class="search-bar">
         <span class="search-icon">${icon('search')}</span>
@@ -3222,7 +3309,7 @@ function modalConfirmDeletePlayer(){
   const pid = UI.modal.payload.pid;
   const pl = getPlayer(pid);
   return `
-    <div class="modal-head"><h2>Eliminare definitivamente?</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Eliminare definitivamente?</h2><button data-action="close-modal">${icon('close')}</button></div>
     <p>Stai per eliminare <strong>${escapeHtml(displayName(pl))}</strong> dall'anagrafica generale. Questa azione rimuove anche tutti i suoi dati storici da allenamenti e partite in ogni squadra, e non si può annullare.</p>
     <p class="muted">Se vuoi solo toglierlo dalla squadra attuale mantenendo lo storico, usa invece "Rimuovi" nella rosa.</p>
     <div style="display:flex;gap:8px;margin-top:14px;">
@@ -3239,7 +3326,7 @@ function modalRemoveFromTeam(){
   // informativo (include la data scelta) e copre già la stessa conferma,
   // farne un'altra qui sarebbe solo una ripetizione.
   return `
-    <div class="modal-head"><h2>Rimuovi dalla squadra</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Rimuovi dalla squadra</h2><button data-action="close-modal">${icon('close')}</button></div>
     <div class="field"><label>Data di uscita</label>
       <input type="date" id="remove-date" value="${todayStr()}">
     </div>
@@ -3254,7 +3341,7 @@ function modalReassignPlayer(){
   const pid = UI.modal.payload.pid;
   const pl = getPlayer(pid);
   return `
-    <div class="modal-head"><h2>Aggiungi di nuovo alla squadra</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Aggiungi di nuovo alla squadra</h2><button data-action="close-modal">${icon('close')}</button></div>
     <p class="muted">${escapeHtml(displayName(pl))} era già stato in questa squadra in passato. Scegli la data del nuovo ingresso.</p>
     <div class="field"><label>Data di ingresso</label>
       <input type="date" id="reassign-date" value="${todayStr()}">
@@ -3277,7 +3364,8 @@ function modalEditTournament(){
     ? `<p class="muted" style="margin:0 0 14px;">⚠️ Questo torneo non è ancora assegnato a una squadra. Salvando, verrà assegnato a <strong>${escapeHtml(team.nome)}</strong>.</p>`
     : '';
   return `
-    <div class="modal-head"><h2>${t?'Modifica torneo':'Nuovo torneo'}</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>${t?'Modifica torneo':'Nuovo torneo'}</h2><button data-action="close-modal">${icon('close')}</button></div>
+    <div class="modal-scroll-body">
     ${claimWarning}
     <form data-form="save-tournament" data-tid="${tid||''}">
       <div class="field"><label>Nome torneo</label>
@@ -3288,6 +3376,7 @@ function modalEditTournament(){
       </div>
       <button type="submit" class="btn block">Salva torneo</button>
     </form>
+    </div>
   `;
 }
 
@@ -3661,8 +3750,12 @@ function renderPopup(){
   if(!p){
     zone.innerHTML = '';
   } else if(p.kind==='info'){
+    // modal-split SEMPRE (non solo per i testi lunghi oggi): la lunghezza di ogni voce di
+    // INFO_TEXTS può cambiare in futuro senza toccare questo file, quindi qui non si valuta
+    // caso per caso come per SPLIT_MODAL_TYPES — vedi il bug corretto (header sticky che
+    // "sanguinava" durante lo scroll, osservato sul testo "Installare l'app").
     zone.innerHTML = `<div class="overlay" data-action="overlay-close-popup">
-      <div class="modal" data-stop="1">${infoPanelHtml(INFO_TEXTS[p.key], 'close-popup')}</div>
+      <div class="modal modal-split" data-stop="1">${infoPanelHtml(INFO_TEXTS[p.key], 'close-popup')}</div>
     </div>`;
   } else {
     const confirmBtn = p.kind==='confirm'
@@ -3746,14 +3839,29 @@ function renderModal(){
   }
   // modal-split: header realmente statico + corpo scrollabile separato,
   // invece di position:sticky — evita alla radice la race di compositing
-  // (vedi commento su .modal-split in styles.css). Applicata solo alle
-  // modali dove il contenuto può realisticamente diventare abbastanza
-  // lungo da attivare lo scroll (liste rosa/presenze, anagrafica, dropdown
-  // con molte opzioni), non a tutte per non introdurre inutilmente una
-  // struttura più complessa dove il contenuto è già sempre corto.
-  const SPLIT_MODAL_TYPES = ['player-andamento','partita','allenamento','raggruppamento','event-detail','add-existing-player','jump-month'];
+  // (vedi commento su .modal-split in styles.css). Applicata alle modali dove il
+  // contenuto può realisticamente diventare abbastanza lungo da attivare lo scroll
+  // (liste rosa/presenze, anagrafica, dropdown con molte opzioni, liste che crescono con
+  // gli anni/le squadre, testo libero in una textarea, elenco impegni/notifiche del
+  // giorno), non a tutte per non introdurre inutilmente una struttura più complessa dove
+  // il contenuto è già sempre corto (es. rinomina stagione/squadra, conferme di
+  // eliminazione: un campo o una frase, non superano mai 90vh).
+  const SPLIT_MODAL_TYPES = [
+    'player-andamento','partita','allenamento','raggruppamento','event-detail','add-existing-player','jump-month',
+    'info','backup','season-manager','team-manager','notifiche','edit-tournament','generale','day','edit-player'
+  ];
   const modalClass = SPLIT_MODAL_TYPES.includes(UI.modal.type) ? 'modal modal-split' : 'modal';
-  zone.innerHTML = `<div class="overlay" data-action="overlay-close">
+  // Modali con campi da compilare: il tocco sullo sfondo non li chiude, per non perdere
+  // quanto digitato e non ancora salvato (elenco esplicito, non dedotto dalla presenza di
+  // <input>: alcuni campi a basso rischio — data con default, ricerca — restano chiudibili
+  // dallo sfondo). Include 'raggruppamento' anche se il suo bozzetto (draft) sopravvive a un
+  // render(): la regola è la stessa degli altri modali con dati, non una sua eccezione.
+  const MODALI_CON_DATI_NON_SALVATI = [
+    'set-name','season-manager','team-manager','edit-season','edit-team',
+    'edit-player','edit-tournament','raggruppamento','allenamento','generale','partita'
+  ];
+  const bloccaSfondo = MODALI_CON_DATI_NON_SALVATI.includes(UI.modal.type);
+  zone.innerHTML = `<div class="overlay"${bloccaSfondo ? '' : ' data-action="overlay-close"'}>
     <div class="${modalClass}" data-stop="1">${inner}</div>
   </div>`;
 }
@@ -3762,7 +3870,8 @@ function modalDay(){
   const date = UI.modal.payload.date;
   const evs = eventsOnDate(UI.teamId, date);
   return `
-    <div class="modal-head"><h2>${formatIt(date)}</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>${formatIt(date)}</h2><button data-action="close-modal">${icon('close')}</button></div>
+    <div class="modal-scroll-body">
     ${evs.length? `<div class="muted" style="margin-bottom:8px;">Impegni già registrati:</div>` : ''}
     ${evs.map(e=>{
       const overlap = evs.find(o=>o.id!==e.id && eventiSiSovrappongono(e,o));
@@ -3771,7 +3880,7 @@ function modalDay(){
       const warnHtml = overlap ? `<button type="button" class="warn-tri" data-action="show-overlap-warning" data-label="${escapeHtml(overlapLabel)}">⚠️</button>` : '';
       return `
       <div class="list-item" data-action="view-event" data-eventid="${e.id}" style="cursor:pointer;">
-        <span style="font-size:20px;">${EVENT_ICON[e.type]}</span>
+        <span style="font-size:20px;" class="${e.type!=='generale' && e.confermato===false ? 'da-confermare' : ''}">${EVENT_ICON[e.type]}</span>
         <div class="name-stack"><div class="name">${EVENT_LABEL[e.type]}${e.note? ' 📝':''}</div><div class="sub">${eventSummary(e)}</div></div>
         ${warnHtml}
         <span class="spacer"></span>
@@ -3788,6 +3897,7 @@ function modalDay(){
         <div style="font-size:11.5px;font-weight:500;opacity:.7;">Anche per tornei giornalieri con più avversari</div>
       </button>
       <button class="btn secondary block" data-action="new-event" data-type="generale" data-date="${date}">${EVENT_ICON.generale} Impegno generale</button>
+    </div>
     </div>
   `;
 }
@@ -3964,11 +4074,11 @@ function modalEventDetail(){
     : (e.type==='generale' ? escapeHtml(e.titolo||'') : ''));
 
   return `
-    <div class="modal-head"><h2>${EVENT_ICON[e.type]} ${typeLabel[e.type]} — ${formatIt(e.date)}</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2><span class="${e.type!=='generale' && e.confermato===false ? 'da-confermare' : ''}">${EVENT_ICON[e.type]}</span> ${typeLabel[e.type]} — ${formatIt(e.date)}</h2><button data-action="close-modal">${icon('close')}</button></div>
     <div class="modal-scroll-body">
       ${header? `<p class="muted">${header}</p>`:''}
       ${e.orario? `<div class="detail-section"><div class="detail-row"><span>Orario</span><strong>${escapeHtml(e.orario)}${e.durata?` (${e.durata} min)`:''}</strong></div></div>` : ''}
-      ${e.mapsLink? `<a href="${escapeHtml(e.mapsLink)}" target="_blank" rel="noopener" class="btn secondary sm" style="text-decoration:none;margin-bottom:10px;">📍 Apri in Google Maps</a>` : ''}
+      ${e.mapsLink && !schemaLinkPericoloso(e.mapsLink)? `<a href="${escapeHtml(e.mapsLink)}" target="_blank" rel="noopener" class="btn secondary sm" style="text-decoration:none;margin-bottom:10px;">📍 Apri la posizione</a>` : ''}
       ${rows? `
       <button type="button" class="btn secondary block" data-action="toggle-presenze-list" data-target="event-detail-presenze">Mostra presenze</button>
       <div id="event-detail-presenze" class="collapsible-section">${rows}</div>` : ''}
@@ -4009,7 +4119,7 @@ function modalRaggruppamento(){
   const roster = rosterAt(UI.teamId, date);
 
   return `
-    <div class="modal-head"><h2>Raggruppamento — ${formatIt(date)}${infoIcon('raggruppamento')}</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Raggruppamento — ${formatIt(date)}${infoIcon('raggruppamento')}</h2><button data-action="close-modal">${icon('close')}</button></div>
     <div class="modal-scroll-body">
     <form data-form="raggruppamento" data-date="${date}" data-eventid="${p.eventId||''}">
       <div class="field"><label>Etichetta</label>
@@ -4132,7 +4242,7 @@ function modalAllenamento(){
     ? (existing.orario ? existing.orario.split(':') : ['',''])
     : defaultOrarioAllenamento(UI.teamId, date).split(':');
   return `
-    <div class="modal-head"><h2>Allenamento — ${formatIt(date)}${infoIcon('allenamento_presenze')}</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Allenamento — ${formatIt(date)}${infoIcon('allenamento_presenze')}</h2><button data-action="close-modal">${icon('close')}</button></div>
     <div class="modal-scroll-body">
     <form data-form="allenamento" data-date="${date}" data-eventid="${existing?existing.id:''}">
       <button type="button" class="btn secondary block" data-action="toggle-presenze-list" data-target="presenze-list-allenamento" data-label="presenze">Mostra presenze</button>
@@ -4179,7 +4289,8 @@ function modalImpegnoGenerale(){
   const existing = p.eventId ? STATE.events.find(e=>e.id===p.eventId) : null;
   const [oraH, oraM] = existing && existing.orario ? existing.orario.split(':') : ['',''];
   return `
-    <div class="modal-head"><h2>Impegno generale — ${formatIt(date)}</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Impegno generale — ${formatIt(date)}</h2><button data-action="close-modal">${icon('close')}</button></div>
+    <div class="modal-scroll-body">
     <form data-form="generale" data-date="${date}" data-eventid="${existing?existing.id:''}">
       <div class="field"><label>Titolo</label>
         <input type="text" name="titolo" value="${existing?escapeHtml(existing.titolo||''):''}" placeholder="es. Riunione genitori" required>
@@ -4197,6 +4308,7 @@ function modalImpegnoGenerale(){
       </div>
       <button type="submit" class="btn block">Salva impegno</button>
     </form>
+    </div>
   `;
 }
 
@@ -4216,7 +4328,7 @@ function modalPartita(){
     : defaultOrarioPartita(UI.teamId, date).split(':');
 
   return `
-    <div class="modal-head"><h2>Partita — ${formatIt(date)}</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Partita — ${formatIt(date)}</h2><button data-action="close-modal">${icon('close')}</button></div>
     <div class="modal-scroll-body">
     <form data-form="partita" data-date="${date}" data-eventid="${existing?existing.id:''}">
       <div class="field"><label>Avversario</label>
@@ -4231,7 +4343,7 @@ function modalPartita(){
         </div>
       </div>
       <div class="field collapsible-section ${(existing?existing.sede:'casa')==='trasferta'?'open':''}" id="maps-link-field">
-        <label>Link Google Maps (facoltativo)</label>
+        <label>Link della posizione (facoltativo)</label>
         <input type="text" name="mapsLink" value="${existing?(existing.mapsLink||''):''}"
           placeholder="Incolla qui il link della posizione">
         <div class="muted" id="maps-link-warning" style="display:none;margin-top:4px;">
@@ -4626,8 +4738,10 @@ document.addEventListener('click', function(e){
 
   // chiusura popup cliccando sfondo scuro (mai esegue onConfirm in questo caso)
   if(e.target.classList && e.target.classList.contains('overlay') && e.target.dataset.action==='overlay-close-popup'){ UI.popup = null; renderPopup(); return; }
-  // chiusura modal cliccando sfondo scuro
-  if(e.target.classList && e.target.classList.contains('overlay')){ closeModal(); return; }
+  // chiusura modal cliccando sfondo scuro: solo se il markup lo consente (data-action
+  // esatto, assente per i modali con dati non salvati — vedi MODALI_CON_DATI_NON_SALVATI
+  // in renderModal()). Controllo simmetrico a quello dei popup sopra.
+  if(e.target.classList && e.target.classList.contains('overlay') && e.target.dataset.action==='overlay-close'){ closeModal(); return; }
 
   const actionEl = e.target.closest('[data-action]');
   if(!actionEl) return;
@@ -4978,6 +5092,16 @@ function sembraLinkMappe(url){
     'maps.apple.com','waze.com','bing.com/maps','here.com','citymapper.com','moovit.com'];
   return noti.some(d => url.toLowerCase().includes(d));
 }
+// Schemi pericolosi: aprirli eseguirebbe codice invece di mostrare una mappa. A differenza
+// di sembraLinkMappe (avviso, non blocca), qui lo schema stesso è pericoloso, non solo "non
+// riconosciuto": si blocca silenziosamente, senza un avviso dedicato (l'avviso "non sembra
+// un link di mappe" compare comunque, dato che questi schemi non sono in quell'elenco).
+// Guardia doppia: qui al salvataggio, e in modalEventDetail al momento di disegnare il link
+// (un vecchio backup importato prima di questo controllo potrebbe già contenerne uno: import
+// non valida il tipo dei campi, solo la struttura).
+function schemaLinkPericoloso(url){
+  return !!url && /^\s*(javascript|data|vbscript)\s*:/i.test(url);
+}
 
 // Ricerca testuale "live": aggiorna mentre si digita, rigenerando solo il
 // contenitore dei risultati (mai l'intera schermata) — l'input stesso non
@@ -5268,6 +5392,7 @@ document.addEventListener('submit', function(e){
       orario: oraFromForm(form),
       durata: null,
       note: fv(form,'note').trim(),
+      confermato: true,   // l'impegno generale non ha presenze/convocati: sempre "confermato", mai segnalato
     });
     closeModal();
     return;
@@ -5285,6 +5410,13 @@ document.addEventListener('submit', function(e){
       note: fv(form,'note').trim(),
       orario: oraFromForm(form),
       durata: fv(form,'durata') ? Number(fv(form,'durata')) : null,
+      // "da confermare" alla creazione (eventId assente): il mister ha appena creato
+      // l'impegno, non necessariamente guardato le presenze. Diventa "confermato" al primo
+      // salvataggio SUCCESSIVO (eventId presente): il mister lo ha riaperto e ha premuto
+      // Salva, anche se non ha cambiato nulla nella sezione presenze (equivale ad averci
+      // guardato e trovato tutto giusto). Nessun percorso oggi salva solo l'orario senza
+      // passare da questa stessa sezione: vedi il commento su upsertEvent in state.js.
+      confermato: !!eventId,
     });
     closeModal();
     return;
@@ -5309,14 +5441,15 @@ document.addEventListener('submit', function(e){
     upsertEvent(eventId, UI.teamId, date, 'partita', {
       avversario: fv(form,'avversario').trim(),
       sede: fv(form,'sede'),
-      mapsLink: fv(form,'mapsLink') || null,
+      mapsLink: (function(){ const v = fv(form,'mapsLink'); return (v && !schemaLinkPericoloso(v)) ? v : null; })(),
       competizione: fv(form,'competizione'),
       torneoId: fv(form,'torneoId') || null,
       dettagliata: document.getElementById('dettagliata-input').value === '1',
       note: fv(form,'note').trim(),
       orario: oraFromForm(form),
       durata: fv(form,'durata') ? Number(fv(form,'durata')) : null,
-      giocatori
+      giocatori,
+      confermato: !!eventId,   // vedi il commento nel ramo 'allenamento' sopra
     });
     closeModal();
     return;
@@ -5340,7 +5473,8 @@ document.addEventListener('submit', function(e){
       note: draft.note || '',
       dettagliata: !!draft.dettagliata,
       squadra: draft.squadra,
-      miniPartite: draft.miniPartite.filter(mm=>mm.avversario||mm.risultato||mm.note)
+      miniPartite: draft.miniPartite.filter(mm=>mm.avversario||mm.risultato||mm.note),
+      confermato: !!eventId,   // vedi il commento nel ramo 'allenamento' sopra
     });
     closeModal();
     return;
@@ -5386,12 +5520,15 @@ function modalNotifiche(){
   const items = todaysReminders();
   if(items.length===0){
     return `
-      <div class="modal-head"><h2>Notifiche di oggi</h2><button data-action="close-modal">✕</button></div>
+      <div class="modal-head"><h2>Notifiche di oggi</h2><button data-action="close-modal">${icon('close')}</button></div>
+      <div class="modal-scroll-body">
       <p class="muted">Nessun impegno o compleanno registrato per oggi.</p>
+      </div>
     `;
   }
   return `
-    <div class="modal-head"><h2>Notifiche di oggi</h2><button data-action="close-modal">✕</button></div>
+    <div class="modal-head"><h2>Notifiche di oggi</h2><button data-action="close-modal">${icon('close')}</button></div>
+    <div class="modal-scroll-body">
     <p class="muted" style="margin-bottom:10px;">${STATE.primaryTeamId? 'Gli impegni e i compleanni della tua squadra principale compaiono per primi.' : 'Impostane una principale dalla Home per vederla sempre per prima qui.'}</p>
     ${items.map(it=>{
       const primaryTag = it.teamId===STATE.primaryTeamId ? ' ⭐' : '';
@@ -5412,6 +5549,7 @@ function modalNotifiche(){
         </div>
       </div>`;
     }).join('')}
+    </div>
   `;
 }
 
@@ -5427,7 +5565,11 @@ function init(){
     UI.teamId = teamExists ? last.teamId : (teams[0] ? teams[0].id : null);
   }
   if(last.statsMatchMode){ UI.statsMatchMode = last.statsMatchMode; }
-  if(!STATE.userName){ UI.modal = {type:'set-name', payload:{}}; }
+  // Il modale del nome non si riapre da solo una volta che il mister l'ha già chiuso una
+  // volta (con o senza aver scritto il nome): hasSeenInfoTip diventa true alla prima
+  // chiusura di 'set-name' in ogni caso (closeModal(), render-modal.js), quindi è già,
+  // di fatto, "l'introduzione è già stata vista" — nessun nuovo campo.
+  if(!STATE.userName && !STATE.hasSeenInfoTip){ UI.modal = {type:'set-name', payload:{}}; }
   normalizeHistory({boot:true});   // voci di cronologia lasciate da un ricaricamento: prima del render, così la sync le trova già gestite
   render();
 }
