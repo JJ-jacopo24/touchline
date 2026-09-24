@@ -813,7 +813,15 @@ const ICONS = {
   // campana variante A: pomello esplicito in cima (rende subito "campana" e non
   // "goccia"), corpo con arco simmetrico (invece della curva libera di prima),
   // batacchio più ampio e staccato dalla base.
-  bell: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v1.2"/><path d="M8 8a4 4 0 0 1 8 0v3.2c0 1.1.4 2.1 1.2 2.9l.8.9H6l.8-.9c.8-.8 1.2-1.8 1.2-2.9V8Z"/><line x1="5" y1="16" x2="19" y2="16"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0"/></svg>',
+  bell: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v1.2"/><path d="M8 8a4 4 0 0 1 8 0v3.2c0 1.1.4 2.1 1.2 2.9l.8.9H6l.8-.9c.8-.8 1.2-1.8 1.2-2.9V8Z"/><line x1="5" y1="16" x2="19" y2="16"/><path d="M10 17.5a2 2 0 0 0 4 0"/></svg>',
+  // campana con notifiche non lette: stesso corpo di "bell" (cupola, fianchi, base,
+  // pomello, batacchio), ma in oro pieno invece che a contorno — nessun contorno scuro
+  // aggiuntivo, a differenza di starFilled: la campana sta sempre sullo stesso sfondo
+  // fisso (--pitch-deep, la topbar), non anche su sfondi chiari come la stella, quindi
+  // non serve un secondo colore per restare leggibile. fill/stroke di default sulla
+  // radice (come "bell", solo con #F0A400 al posto di currentColor): la sola cupola
+  // (il corpo chiuso) li sovrascrive per diventare piena.
+  bellFilled: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="#F0A400" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v1.2"/><path d="M8 8a4 4 0 0 1 8 0v3.2c0 1.1.4 2.1 1.2 2.9l.8.9H6l.8-.9c.8-.8 1.2-1.8 1.2-2.9V8Z" fill="#F0A400" stroke="none"/><line x1="5" y1="16" x2="19" y2="16"/><path d="M10 17.5a2 2 0 0 0 4 0"/></svg>',
   pencil: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l.8-3.6L15.6 5.6a1 1 0 0 1 1.4 0l1.4 1.4a1 1 0 0 1 0 1.4L7.6 19.2 4 20Z"/><line x1="13.8" y1="7.4" x2="16.6" y2="10.2"/></svg>',
   // telefono variante A: tacca fotocamera in alto + barra home in basso (due
   // dettagli invece di uno), corpo un filo più stretto — più riconoscibile
@@ -1769,12 +1777,18 @@ function isStandaloneMode(){
 
 function renderTopbar(){
   const el = document.getElementById('topbar');
-  const notifBadge = hasUnseenReminders() ? '<span class="notif-dot"></span>' : '';
+  // campana piena/vuota come la stella (starFilled/starOutline): stesso stato di prima
+  // (hasUnseenReminders(), invariato), calcolato una sola volta e riusato sia per la
+  // scelta dell'icona sia per il pallino — non possono più disallinearsi tra loro.
+  // Il pallino (.notif-dot) è stato tolto: un solo segnale (la campana stessa), non due
+  // insieme. data-bell (come data-star sulla stellina) è solo per i test: un
+  // <button><svg>...</svg></button> non ha un textContent utile da verificare.
+  const unread = hasUnseenReminders();
   // promemoria backup: puntino chiaro sull'icona del backup (id fisso: dopo un export
   // lo si nasconde direttamente nel DOM, senza render(), vedi hideBackupReminderUI)
   const backupBadge = backupReminder() ? '<span class="backup-dot" id="backup-dot"></span>' : '';
   const installBtn = isStandaloneMode() ? '' : `<button class="icon-btn" data-action="show-info" data-infokey="installa" title="Come installare l'app">${icon('phone')}</button>`;
-  const installBackup = `${installBtn}<button class="icon-btn" data-action="open-notifiche" title="Notifiche">${icon('bell')}${notifBadge}</button><button class="icon-btn" data-action="open-backup" title="Backup e ripristino">${icon('sync')}${backupBadge}</button>`;
+  const installBackup = `${installBtn}<button class="icon-btn" data-action="open-notifiche" data-bell="${unread?'filled':'outline'}" title="Notifiche">${unread?icon('bellFilled'):icon('bell')}</button><button class="icon-btn" data-action="open-backup" title="Backup e ripristino">${icon('sync')}${backupBadge}</button>`;
 
   if(UI.screen==='team' && currentTeam()){
     const team = currentTeam();
