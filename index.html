@@ -128,7 +128,7 @@
     color:var(--chalk);
     width:46px;height:46px;border-radius:9px;
     display:flex;align-items:center;justify-content:center;
-    font-size:19px;flex-shrink:0;position:relative;
+    font-size:24px;flex-shrink:0;position:relative;
   }
   .notif-dot{
     position:absolute;top:5px;right:5px;width:11px;height:11px;border-radius:50%;
@@ -239,7 +239,6 @@
   .cal-cell .num{font-weight:700;color:var(--ink);font-size:14px;line-height:1;}
   .cal-cell .dots{
     display:flex;
-    gap:1px;
     margin-top:2px;
     justify-content:center;
     align-self:stretch;
@@ -272,17 +271,33 @@
     color:#fff;background:var(--pitch-light);
     border-radius:4px;padding:0 2px;
   }
-  /* Segno aggiuntivo (non solo colore) per "da confermare": un anello attorno
-     all'icona, non un puntino nell'angolo. Prima versione (puntino ::after, stessa
-     tecnica di .notif-dot/.backup-dot) verificata via screenshot a schermo intero
-     a 20px/16px: il colore si leggeva bene, il puntino no (poco più di un neo
-     accanto all'icona, specialmente a 16px con 2 icone nella stessa cella).
+  /* Segno aggiuntivo (non solo colore) per "da confermare": un anello, non un
+     puntino nell'angolo. Prima versione (puntino ::after, stessa tecnica di
+     .notif-dot/.backup-dot) verificata via screenshot a schermo intero a 20px/16px:
+     il colore si leggeva bene, il puntino no (poco più di un neo accanto
+     all'icona, specialmente a 16px con 2 icone nella stessa cella).
      box-shadow (non border, che aggiungerebbe spazio nel box) disegna un anello
-     pulito attorno all'intera icona: una forma grande quanto l'icona stessa,
-     non un dettaglio da 7px in un angolo — più leggibile alla dimensione reale. */
-  .cal-cell .dots .ev-emoji.da-confermare{
+     pulito. UN SOLO anello attorno a .dots-group (il gruppo di icone del
+     giorno), non uno per icona (vedi render-calendar.js): con 2 icone e 1px di
+     gap, due anelli singoli da 2px ciascuno si sovrapponevano di 3px, una
+     macchia unica invece di due cerchi distinti (screenshot reale, cella con
+     allenamento+partita). .dots-group è un contenitore a parte, separato da
+     .dots (che continua a centrare il gruppo nella cella con
+     stretch+justify-content, invariati; il gap:1px tra le icone si è solo
+     spostato qui sotto, dove ora vivono le icone): serve un bersaglio stretto
+     attorno alle sole icone, non largo quanto .dots (che si estende su tutta
+     la larghezza della cella per via di align-self:stretch). border-radius
+     fisso (non 50%, che su 2 icone affiancate stirerebbe l'anello in
+     un'ellisse) dà una forma a "pillola" con 2 icone e resta comunque vicino
+     a un cerchio con 1 sola. */
+  .cal-cell .dots-group{
+    display:flex;
+    align-items:center;
+    gap:1px;
+  }
+  .cal-cell .dots-group.da-confermare{
     box-shadow:0 0 0 2px var(--gold);
-    border-radius:50%;
+    border-radius:12px;
   }
   /* torta compleanno: rimpicciolita e spinta nell'angolo vero, per non
      sovrapporsi al numero del giorno (centrato) nei giorni a due cifre */
@@ -795,9 +810,15 @@ const ICONS = {
   // marrone caldo già usato letteralmente in styles.css (banner, badge ritardo,
   // nota della scheda stampata), qui non ancora un token — coerente con quello.
   starFilled: '<svg viewBox="0 0 24 24" width="1em" height="1em"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26" fill="#F0A400" stroke="#5C3D0E" stroke-width="1.1" stroke-linejoin="round"/></svg>',
-  bell: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16c0-1 .4-1.8 1-2.4.6-.7 1-1.6 1-2.6V8a4 4 0 0 1 8 0v3c0 1 .4 1.9 1 2.6.6.6 1 1.4 1 2.4Z"/><line x1="6" y1="16" x2="18" y2="16"/><path d="M10.5 19a1.5 1.5 0 0 0 3 0"/></svg>',
+  // campana variante A: pomello esplicito in cima (rende subito "campana" e non
+  // "goccia"), corpo con arco simmetrico (invece della curva libera di prima),
+  // batacchio più ampio e staccato dalla base.
+  bell: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v1.2"/><path d="M8 8a4 4 0 0 1 8 0v3.2c0 1.1.4 2.1 1.2 2.9l.8.9H6l.8-.9c.8-.8 1.2-1.8 1.2-2.9V8Z"/><line x1="5" y1="16" x2="19" y2="16"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0"/></svg>',
   pencil: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l.8-3.6L15.6 5.6a1 1 0 0 1 1.4 0l1.4 1.4a1 1 0 0 1 0 1.4L7.6 19.2 4 20Z"/><line x1="13.8" y1="7.4" x2="16.6" y2="10.2"/></svg>',
-  phone: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="7" y1="17.5" x2="17" y2="17.5"/></svg>',
+  // telefono variante A: tacca fotocamera in alto + barra home in basso (due
+  // dettagli invece di uno), corpo un filo più stretto — più riconoscibile
+  // come smartphone a 19px rispetto al solo rettangolo con una riga.
+  phone: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><line x1="10.5" y1="5" x2="13.5" y2="5"/><line x1="9.5" y1="18.5" x2="14.5" y2="18.5"/></svg>',
   close: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>',
 };
 function icon(name){ return ICONS[name] || ''; }
@@ -1871,7 +1892,7 @@ function renderHomeDashboard(){
         <div class="section-title" style="margin-bottom:2px;">${greetingLine()}</div>
         <div class="muted">🕓 Dati aggiornati il: ${escapeHtml(updatedLabel)}</div>
       </div>
-      <button class="btn ghost sm" data-action="open-set-name" title="Cambia nome">${icon('pencil')}</button>
+      <button class="btn ghost sm" style="font-size:24px;" data-action="open-set-name" title="Cambia nome">${icon('pencil')}</button>
     </div>
 
     <div class="tile-grid">
@@ -2894,14 +2915,22 @@ function renderCalendarView(team){
     const presentTypes = ordineTipi.filter(t => conteggioPerTipo[t]);
     const shownTypes = presentTypes.slice(0,2);
     const hiddenTypesCount = presentTypes.length - shownTypes.length;
+    // "da confermare": un SOLO anello attorno all'intero gruppo di icone del giorno
+    // (.dots-group), non uno per icona. Con 2 icone (font-size 16px) e 1px di gap tra
+    // loro, due anelli singoli (box-shadow di 2px ciascuno) si sovrapponevano di 3px,
+    // formando una macchia unica invece di due cerchi distinti — vedi
+    // .dots-group.da-confermare in styles.css. Calcolato su TUTTI gli eventi del
+    // giorno, non solo i 2 mostrati: un tipo da confermare oltre il secondo (nascosto
+    // dietro il badge "+N", che non può portare un anello) prima non aveva mai un
+    // segnale proprio; ora il gruppo lo segnala comunque.
+    const giornoDaConfermare = Object.keys(daConfermarePerTipo).length > 0;
     const dots = shownTypes
       .map((t,i) => {
         const n = conteggioPerTipo[t];
         const isLast = i===shownTypes.length-1;
         const countHtml = n>1 ? `<span class="ev-count">×${n}</span>` : '';
         const moreHtml = (isLast && hiddenTypesCount>0) ? `<span class="more-badge">+${hiddenTypesCount}</span>` : '';
-        const daConfermareClass = daConfermarePerTipo[t] ? ' da-confermare' : '';
-        return `<span class="ev-emoji${daConfermareClass}">${EVENT_ICON[t]}${countHtml}${moreHtml}</span>`;
+        return `<span class="ev-emoji">${EVENT_ICON[t]}${countHtml}${moreHtml}</span>`;
       }).join('');
     const isWeekend = idx%7===5 || idx%7===6;
     const classes = ['cal-cell'];
@@ -2912,7 +2941,7 @@ function renderCalendarView(team){
     return `<button class="${classes.join(' ')}" data-action="open-day" data-date="${iso}">
       ${bdayThisDay?'<span class="cake">🎂</span>':''}
       <span class="num">${c.date.getDate()}</span>
-      <span class="dots">${dots}</span>
+      <span class="dots"><span class="dots-group${giornoDaConfermare?' da-confermare':''}">${dots}</span></span>
     </button>`;
   }).join('');
 
@@ -2925,9 +2954,9 @@ function renderCalendarView(team){
   return `
     <div class="card">
       <div class="cal-head">
-        <button class="btn ghost sm" data-action="cal-prev" aria-label="Mese precedente">${icon('chevronLeft')}</button>
+        <button class="btn ghost sm" style="font-size:24px;" data-action="cal-prev" aria-label="Mese precedente">${icon('chevronLeft')}</button>
         <button class="cal-title-btn" data-action="open-jump-month">${MESI[m]} ${y} ▾</button>
-        <button class="btn ghost sm" data-action="cal-next" aria-label="Mese successivo">${icon('chevronRight')}</button>
+        <button class="btn ghost sm" style="font-size:24px;" data-action="cal-next" aria-label="Mese successivo">${icon('chevronRight')}</button>
       </div>
       ${!isCurrentMonth? `<button class="btn secondary sm" style="margin-bottom:10px;" data-action="cal-today">${icon('calendarToday')} Torna a oggi</button>` : ''}
       <div class="cal-grid">
