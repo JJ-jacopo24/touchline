@@ -716,7 +716,13 @@ let UI = {
   modal: null,                // {type, payload}
   popup: null,                 // {kind:'alert'|'confirm', message, danger, confirmLabel, onConfirm} — indipendente da "modal", si sovrappone senza sostituirlo
   bannerDismissed: false,
-  notifSeenToday: false,      // pallino sulla campanella: sparisce dopo aver aperto il pannello notifiche
+  // campana piena/vuota: id dei promemoria (impegni/compleanni di oggi) già mostrati
+  // all'ultima apertura del pannello notifiche — non un semplice booleano "ho guardato
+  // oggi", perché un promemoria nuovo arrivato DOPO un'apertura precedente deve poter
+  // riaccendere la campana nella stessa sessione (vedi reminderId/hasUnseenReminders in
+  // events.js). Di sessione come prima (mai in STATE/localStorage): un riavvio dell'app
+  // "dimentica" i promemoria già visti, esattamente come già succedeva oggi.
+  notifSeenIds: new Set(),
   statsTournamentFilter: '',
   statsMatchMode: 'totale',   // 'totale' | 'partita' | 'raggruppamento' — colonne partita-simili in Statistiche
   cardFields: null,           // override temporaneo campi scheda
@@ -4866,7 +4872,10 @@ document.addEventListener('click', function(e){
     case 'cal-next':
       UI.calMonth++; if(UI.calMonth>11){ UI.calMonth=0; UI.calYear++; } render(); break;
     case 'open-jump-month': openModal('jump-month'); break;
-    case 'open-notifiche': UI.notifSeenToday = true; openModal('notifiche'); break;
+    // "visto" = l'istantanea di CIÒ che il pannello mostra ora, non un generico "ho guardato
+    // oggi": se dopo questa apertura arriva un promemoria nuovo, il suo id non è in questo
+    // Set, quindi hasUnseenReminders() torna true di nuovo (vedi reminderId sopra).
+    case 'open-notifiche': UI.notifSeenIds = new Set(todaysReminders().map(reminderId)); openModal('notifiche'); break;
     case 'open-notif-event': {
       const ev = STATE.events.find(x=>x.id===actionEl.dataset.eventid);
       const evTeam = ev && getTeam(ev.teamId);
@@ -5556,8 +5565,17 @@ function todaysReminders(){
   });
   return items;
 }
+// Identificatore stabile di un promemoria (evento o compleanno), usato per capire quali
+// sono "nuovi" rispetto all'ultima apertura del pannello notifiche. Per gli impegni è
+// l'id dell'evento: resta lo stesso anche se lo si modifica in seguito (Object.assign in
+// upsertEvent non tocca l'id), quindi un impegno già visto e poi solo aggiornato NON torna
+// a contare come nuovo. Per i compleanni non c'è un id "evento": si usa squadra+giocatore,
+// come già raggruppa todaysReminders (lo stesso giocatore in due squadre conta due volte).
+function reminderId(item){
+  return item.kind==='birthday' ? `birthday:${item.teamId}:${item.player.id}` : `event:${item.event.id}`;
+}
 function hasUnseenReminders(){
-  return !UI.notifSeenToday && todaysReminders().length>0;
+  return todaysReminders().some(it => !UI.notifSeenIds.has(reminderId(it)));
 }
 function modalNotifiche(){
   const items = todaysReminders();
