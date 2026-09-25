@@ -750,7 +750,7 @@ window.UI = UI;
 const EXIT_WINDOW_MS = 2500;       // doppio Indietro da Home: tempo entro cui il secondo Indietro esce dall'app (dopo, si ricomincia)
 const NORMALIZE_TIMEOUT_MS = 1500; // attesa massima del popstate dopo un history.go() nostro: scaduta, si riallinea lo stato senza altri go()
 const RELOAD_RELEASE_MS = 3000;    // dopo location.reload() (asincrono) la sync resta sospesa per questo tempo: se la pagina si ricarica non riparte mai; se il ricarico non parte, riprende da sola
-const HISTORY_MAX_DEPTH = 7;       // profondità massima plausibile (guardia 1 + schermata 3 + scheda 1 + modale 1 + info 1): oltre, lo stato non è affidabile e non si tenta nessun go()
+const HISTORY_MAX_DEPTH = 7;       // profondità massima plausibile (guardia 1 + schermata 3 + scheda 1 + modale 1 + popup 1, S1/2b: avviso/conferma/info è un solo campo, mai una pila): oltre, lo stato non è affidabile e non si tenta nessun go()
 
 function enterTeam(teamId){
   UI.teamId = teamId;
@@ -3436,7 +3436,8 @@ function modalEditTournament(){
    dell'app, non tenuta a mano:
      livelli = guardia (0 o 1, vedi sotto) + schermata (Home 0; Stagioni, Anagrafica, Statistiche generali 1;
                lista Squadre 2; squadra 3) + scheda (+1 in squadra se non è il Calendario)
-               + modale + info (popup 'info')
+               + modale + popup (avviso/conferma/info — S1, blocco 2b: un popup è un livello come gli
+               altri, non solo 'info' come prima)
    syncHistory() (in fondo a render() e renderPopup()) riporta la cronologia a quel
    numero: pushState per le voci che mancano, history.go() per quelle in eccesso.
    Non chiama MAI render(): solo history.*.
@@ -3472,13 +3473,16 @@ let histGuardWanted = false;       // guardia del doppio Indietro: una voce sott
                                     // passare dalla cronologia — non supportato su Safari/iPhone al 22-09-2026,
                                     // richiede un gradino a sé con verifica sul telefono vero.
 let histExitTimer = null;          // finestra del doppio Indietro (EXIT_WINDOW_MS)
+let histApiAccodata = false;       // apiObbligatoria richiesta mentre syncHistory() era bloccata (histHold
+                                    // o un go() già in corso): non va persa, si onora alla prima sync utile
+                                    // (blocco 2b-3, correzione: prima veniva scartata in un no-op silenzioso)
 
 function historyLayers(){
   let n = HIST_SCREEN_DEPTH[UI.screen] || 0;
   if(histGuardWanted) n++;                                  // guardia del doppio Indietro (una voce sotto la Home)
   if(UI.screen==='team' && UI.view!=='calendario') n++;   // la scheda iniziale è il Calendario: le altre sono UN livello sopra (cambiare tra loro non aggiunge voci)
   if(UI.modal) n++;
-  if(UI.popup && UI.popup.kind==='info') n++;
+  if(UI.popup) n++;   // S1 (blocco 2b): qualunque popup (avviso/conferma/info) è un livello, non solo 'info'
   return n;
 }
 // La pagina è stata toccata? Senza l'API userActivation si considera di sì (i push non vengono trattenuti).
@@ -3565,7 +3569,19 @@ function histSettled(){
 }
 // Porta la cronologia a historyLayers(): mai un render().
 function syncHistory(opz){
-  if(histHold > 0 || histPending) return;
+  const apiVoluta = !!(opz && opz.apiObbligatoria);
+  if(histHold > 0 || histPending){
+    // non perdere l'intenzione (blocco 2b-3): se questa chiamata voleva apiObbligatoria ma un altro
+    // go() è già in corso (o la sync è sospesa), la si accoda invece di scartarla in un no-op silenzioso
+    // — altrimenti la riconciliazione vera, quando arriverà da histSettled() SENZA opz, la perderebbe e
+    // rischierebbe un go() non protetto anche senza Navigation API (proprio ciò che apiObbligatoria vuole evitare)
+    if(apiVoluta) histApiAccodata = true;
+    return;
+  }
+  // consumata qui, alla prima chiamata non bloccata: sia che serva davvero (ramo go, sotto) sia che no
+  // (nessun cambiamento, o un push) — non deve restare in giro ad attaccarsi a un go() scollegato più avanti
+  const apiObbligatoria = apiVoluta || histApiAccodata;
+  histApiAccodata = false;
   const want = historyLayers(), have = historyDepth();
   if(have === want) return;
   if(have < want){
@@ -3582,7 +3598,7 @@ function syncHistory(opz){
     }
     return;
   }
-  safeGo(have - want, opz);
+  safeGo(have - want, Object.assign({}, opz, {apiObbligatoria}));
 }
 function historyHold(){ histHold++; }
 function historyRelease(opz){ if(histHold > 0) histHold--; if(histHold === 0) syncHistory(opz); }
@@ -3645,7 +3661,9 @@ function cleanReload(reloadFn){
 // Chiude UN livello (il più alto) e restituisce quale; null se non c'è nulla da chiudere.
 // Usata sia dal tasto Indietro sia dal pulsante "<".
 function closeTopLayer(opz){
-  if(UI.popup && UI.popup.kind==='info'){ UI.popup = null; renderPopup(); return 'info'; }
+  // S1 (blocco 2b): qualunque popup si chiude così, avviso/conferma inclusi — MAI onConfirm
+  // (Indietro su un showConfirm equivale a "Annulla", come il tasto close-popup già fa).
+  if(UI.popup){ UI.popup = null; renderPopup(); return 'popup'; }
   if(UI.modal){ UI.modal = null; render(); return 'modale'; }
   if(UI.screen !== 'home'){
     const eraScheda = UI.screen==='team' && UI.view!=='calendario';   // da una scheda diversa dal Calendario si torna prima al Calendario
@@ -3675,25 +3693,40 @@ window.addEventListener('popstate', function(){
       if(!chiuso) break;
     }
   }finally{ histHold--; }
-  // primo Indietro da Home: non esce, mostra un messaggio breve. Con un avviso o una conferma aperti
-  // il messaggio NON compare (regola i), ma il riarmo parte comunque (B1): senza, la guardia resterebbe
-  // consumata "per sempre" finché non arriva un tocco casuale, e il PROSSIMO Indietro (che l'utente può
-  // premere subito, senza toccare nulla nel mezzo) troverebbe zero protezione e uscirebbe senza preavviso.
-  if(guardiaConsumata){
-    if(!UI.popup) showExitToast();
-    else scheduleGuardRearm();
-  }
-  syncHistory();
+  // primo Indietro da Home: non esce, mostra un messaggio breve.
+  // STORIA (regola "i", gradino 4 -> rimossa nel 2b-5): prima di S1 un popup non aveva una voce
+  // propria, quindi un Indietro poteva "attraversarlo" e consumare la guardia sotto in silenzio,
+  // senza mostrare il messaggio (il popup restava aperto sopra). Questo if distingueva i due casi.
+  // Con S1 (blocco 2b) un popup È un livello e closeTopLayer() lo controlla per PRIMO: nel ciclo qui
+  // sopra, se UI.popup era valorizzato, la prima iterazione lo chiude sempre (mai 'guardia' nella
+  // stessa iterazione), quindi quando guardiaConsumata diventa vero UI.popup è SEMPRE già null — anche
+  // nel caso di uno scarto multiplo di Chrome (il ciclo chiude comunque in ordine di priorità: popup,
+  // poi modale, poi schermata, poi guardia, mai il contrario, qualunque sia l'ordine reale scartato dal
+  // browser). Verificato in modo esaustivo (non solo empirico) durante il 2b-5: il ramo "silenzioso"
+  // non è raggiungibile in NESSUN caso col codice attuale, non solo in quello normale (già verificato
+  // nel 2b-1) — rimosso, non è mai stata una vera rete di sicurezza. Se una futura modifica a
+  // closeTopLayer()/a questo ciclo cambiasse l'ordine di chiusura, andrebbe rivalutato da capo.
+  if(guardiaConsumata) showExitToast();
+  // coda dei popup (blocco 2b-4): la promozione durante il ciclo qui sopra è volutamente bloccata
+  // (promuoviPopupAccodato() controlla histHold, sempre >0 mentre il ciclo gira) — altrimenti il
+  // popup appena promosso da closeTopLayer() farebbe subito risalire historyLayers() e il ciclo,
+  // non sapendo distinguere "un livello ancora da chiudere" da "uno appena apparso", lo richiuderebbe
+  // nello stesso Indietro, mai mostrato all'utente (verificato). Qui, a ciclo finito e histHold=0, si
+  // riprova: se c'era qualcosa in coda, ORA può comparire.
+  if(promuoviPopupAccodato()) renderPopup();
+  else syncHistory();
 });
 
 /* ---- Doppio Indietro da Home ----
    Una voce di guardia sotto la Home (historyLayers la conta) è voluta fin dall'avvio del documento
    (histGuardWanted=true in normalizeHistory({boot:true})); la sua prima voce si crea comunque anche a
    pagina non toccata (A1, vedi syncHistory). Il primo Indietro da Home consuma la guardia (la pagina
-   resta) e mostra un messaggio per EXIT_WINDOW_MS; un secondo Indietro entro quel tempo trova la
-   cronologia già a zero e il browser esce da sé. Scaduto il tempo la guardia si ricrea (B1: anche se il
-   messaggio non è mai comparso, perché un avviso/conferma era aperto — regola i). Un tocco durante la
-   finestra la ricrea subito. Il messaggio è un nodo creato direttamente nel DOM: mai un render().
+   resta) e mostra SEMPRE un messaggio (showExitToast, gradino 2b-5: prima c'era un caso "silenzioso",
+   la regola "i", rimossa perché provata irraggiungibile — vedi il commento nel gestore di popstate) per
+   EXIT_WINDOW_MS; un secondo Indietro entro quel tempo trova la cronologia già a zero e il browser esce
+   da sé. Scaduto il tempo la guardia si ricrea da sola (B1, gradino 4: senza bisogno di un tocco a
+   caso). Un tocco durante la finestra la ricrea subito. Il messaggio è un nodo creato direttamente nel
+   DOM: mai un render().
    LIMITE NOTO (gradino 4, chiuso così il 22-09-2026, rinuncia consapevole): se l'Indietro è il PRIMO
    gesto in assoluto sulla pagina (apertura mai toccata, o Home dopo un ricaricamento), la voce di
    guardia può essere scartata da Chrome comunque, e l'app esce senza mostrare il messaggio — come
@@ -3774,26 +3807,60 @@ function closeModal(){
 // comparire sopra un modale già aperto senza perderne i dati in corso (es.
 // la bozza di un raggruppamento) — per questo vive nella sua zona DOM
 // separata (#popup-zone), non dentro #modal-zone.
-function showAlert(message){
-  UI.popup = {kind:'alert', message};
+// Cronologia (S1, blocco 2b): qualunque popup è un livello come gli altri (historyLayers),
+// quindi Indietro chiude SOLO il popup, uno alla volta, come già succedeva per 'info'; su un
+// showConfirm equivale ad Annulla (mai onConfirm, vedi closeTopLayer). La voce si toglie da
+// sola alla chiusura, in qualunque modo avvenga (Ho capito/✕/sfondo/Esc/Indietro).
+// Coda (blocco 2b-4, correzione): UI.popup è un campo singolo — un popup aperto in modo
+// ASINCRONO (performSave dopo il suo debounce, la lettura del file in importBackupFile) mentre
+// l'utente ne ha già un altro a schermo non lo sostituisce più: si accoda (histPopupAccodati,
+// FIFO — non un elemento solo: due fonti asincrone indipendenti possono arrivare entrambe prima
+// che l'utente chiuda quello attuale) e appare solo dopo, quando l'utente chiude quello attuale
+// in un modo qualunque. Unico punto d'ingresso per aprire un popup: apriPopup(), usata da tutte
+// e tre show*(), così la coda vale per tutti i popup, non solo per alert/confirm.
+let histPopupAccodati = [];
+function apriPopup(obj){
+  if(UI.popup){ histPopupAccodati.push(obj); return; }
+  UI.popup = obj;
   renderPopup();
+}
+function showAlert(message){
+  apriPopup({kind:'alert', message});
 }
 function showConfirm(message, onConfirm, opts){
   opts = opts || {};
-  UI.popup = {kind:'confirm', message, onConfirm, danger:!!opts.danger, confirmLabel: opts.confirmLabel || 'Conferma'};
-  renderPopup();
+  apriPopup({kind:'confirm', message, onConfirm, danger:!!opts.danger, confirmLabel: opts.confirmLabel || 'Conferma'});
 }
 // Info (ⓘ) toccata DENTRO un modale: si mostra come popup, non con openModal('info'),
 // che sostituirebbe il modale attivo e distruggerebbe form, note e bozze. Come
 // showAlert usa solo renderPopup (mai render()) e non tocca UI.modal.
-// Cronologia: l'info è un livello come gli altri (historyLayers), quindi Indietro chiude
-// solo l'info e non il modale sotto; la voce si toglie da sola alla chiusura.
 function showInfo(key){
   if(!INFO_TEXTS[key]) return;
-  UI.popup = {kind:'info', key};
-  renderPopup();
+  apriPopup({kind:'info', key});
+}
+// Promuove il primo popup in coda, ma SOLO se histHold===0: durante il ciclo di chiusura a cascata
+// del popstate (histHold>0) una promozione qui verrebbe richiusa subito, nello stesso Indietro,
+// perché il ciclo non sa distinguere "un livello ancora da chiudere" da "uno appena apparso"
+// (verificato). Restituisce true se ha promosso qualcosa (il chiamante disegna con renderPopup()).
+function promuoviPopupAccodato(){
+  if(UI.popup || histHold > 0 || !histPopupAccodati.length) return false;
+  UI.popup = histPopupAccodati.shift();
+  return true;
 }
 function renderPopup(){
+  // promozione dalla coda: TUTTI i punti che chiudono un popup DIRETTAMENTE (non via Indietro) fanno
+  // UI.popup=null seguito da renderPopup() (close-popup, confirm-popup, overlay-close-popup, Esc, e
+  // closeTopLayer quando lo chiama il pulsante "<"): un solo controllo qui li copre tutti, senza
+  // toccarli uno per uno. Il caso "Indietro fisico" ha invece histHold>0 durante il ciclo che chiama
+  // questa stessa funzione (vedi promuoviPopupAccodato) e viene gestito a parte, dopo il ciclo, nel
+  // gestore di popstate. Cronologia: quando la promozione avviene QUI (histHold===0, chiusura
+  // diretta), historyLayers() vede un popup sia prima sia dopo (uno chiuso, uno promosso) nella
+  // STESSA chiamata: nessun push né go, la stessa voce passa di mano. Quando invece avviene nel
+  // gestore di popstate (dopo un Indietro fisico), il browser ha già retrocesso PRIMA che quel
+  // codice giri: la voce è già stata consumata davvero, quindi lì la sync farà un push vero per il
+  // popup promosso, non un riuso — gestito già da syncHistory()/historyLayers(), nessuna modifica
+  // al motore di cronologia (verificato).
+  promuoviPopupAccodato();
   const zone = document.getElementById('popup-zone');
   const p = UI.popup;
   if(!p){
@@ -3827,7 +3894,9 @@ function renderPopup(){
 // Scorciatoie da tastiera (PC). Disattivate mentre si scrive in un campo o con un modale aperto,
 // per non interferire con l'inserimento dati.
 document.addEventListener('keydown', function(e){
-  if(e.key==='Escape' && UI.popup && UI.popup.kind==='info'){ UI.popup = null; renderPopup(); return; }
+  // S1 (blocco 2b): Esc chiude qualunque popup, avviso/conferma inclusi (non solo 'info' come prima),
+  // per coerenza con Indietro — su un showConfirm equivale ad Annulla, mai onConfirm.
+  if(e.key==='Escape' && UI.popup){ UI.popup = null; renderPopup(); return; }
   if(e.key==='Escape' && UI.modal){ closeModal(); return; }
 
   const tag = (e.target.tagName||'').toLowerCase();
