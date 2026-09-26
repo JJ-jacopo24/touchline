@@ -1768,9 +1768,9 @@ function render(){
 //     come file locale, che non ha un manifest raggiungibile);
 // (b) navigator.standalone, il segnale storico di iOS per "Aggiungi a Home" — resta
 //     necessario proprio per il caso "file locale senza manifest" su iPhone/iPad.
-// Avvolta in try/catch: window.matchMedia non esiste in ogni ambiente (jsdom, i nostri
-// test, non lo implementa) e non deve mai far fallire renderTopbar()/render(). Nessun
-// listener di cambio: la modalità standalone non cambia a sessione di pagina aperta.
+// Avvolta in try/catch: window.matchMedia non esiste in ogni ambiente e non deve
+// mai far fallire renderTopbar()/render(). Nessun listener di cambio: la modalità
+// standalone non cambia a sessione di pagina aperta.
 function isStandaloneMode(){
   try{
     if(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
@@ -3722,11 +3722,14 @@ window.addEventListener('popstate', function(){
    (histGuardWanted=true in normalizeHistory({boot:true})); la sua prima voce si crea comunque anche a
    pagina non toccata (A1, vedi syncHistory). Il primo Indietro da Home consuma la guardia (la pagina
    resta) e mostra SEMPRE un messaggio (showExitToast, gradino 2b-5: prima c'era un caso "silenzioso",
-   la regola "i", rimossa perché provata irraggiungibile — vedi il commento nel gestore di popstate) per
-   EXIT_WINDOW_MS; un secondo Indietro entro quel tempo trova la cronologia già a zero e il browser esce
-   da sé. Scaduto il tempo la guardia si ricrea da sola (B1, gradino 4: senza bisogno di un tocco a
-   caso). Un tocco durante la finestra la ricrea subito. Il messaggio è un nodo creato direttamente nel
-   DOM: mai un render().
+   la regola "i", rimossa perché provata irraggiungibile — vedi il commento nel gestore di popstate).
+   Un secondo Indietro entro EXIT_WINDOW_MS trova la cronologia già a zero e il browser esce da sé.
+   Scaduto il tempo la guardia si riarma da sola internamente (B1, gradino 4: senza bisogno di un tocco
+   a caso), ma il MESSAGGIO resta a schermo finché non arriva un tocco o un altro Indietro (gradino
+   guardia-persistente: prima spariva da solo insieme al riarmo, promettendo un avviso che l'Indietro
+   successivo poteva poi non mantenere — vedi LIMITE NOTO sotto). Un tocco, in qualsiasi momento, nasconde
+   subito il messaggio (e riarma la guardia se non lo era già). Il messaggio è un nodo creato direttamente
+   nel DOM: mai un render().
    LIMITE NOTO (gradino 4, chiuso così il 22-09-2026, rinuncia consapevole): se l'Indietro è il PRIMO
    gesto in assoluto sulla pagina (apertura mai toccata, o Home dopo un ricaricamento), la voce di
    guardia può essere scartata da Chrome comunque, e l'app esce senza mostrare il messaggio — come
@@ -3739,7 +3742,6 @@ function hideExitToast(){
 function scheduleGuardRearm(){
   clearTimeout(histExitTimer);
   histExitTimer = setTimeout(function(){
-    hideExitToast();
     histGuardWanted = true;
     syncHistory();
   }, EXIT_WINDOW_MS);
@@ -3782,7 +3784,7 @@ function armGuard(){
   syncHistory();
 }
 ['pointerup', 'touchend', 'click', 'keydown'].forEach(function(t){
-  document.addEventListener(t, function(){ catturaVociInSospeso(); armGuard(); }, true);
+  document.addEventListener(t, function(){ hideExitToast(); catturaVociInSospeso(); armGuard(); }, true);
 });
 
 /* =========================================================
@@ -4719,10 +4721,10 @@ window.addEventListener('resize', closeOpenCdropMenus);
 // closest('.cdrop') (da cui dipendono i selettori field-pick/pill-pick), e
 // un re-render del modale che sovrascrive l'innerHTML si porta via il menu
 // insieme al resto — nessun nodo orfano da ripulire a mano.
-// getBoundingClientRect()/innerHeight in jsdom (i nostri test) restituiscono
-// sempre zero — in quel caso non applichiamo alcun calcolo e resta il
-// comportamento CSS di default (position:absolute, apertura verso il
-// basso, max-height statico dove già presente inline).
+// Se le misure risultano tutte a zero (elemento non ancora visibile o non ancora
+// inserito nel DOM), non applichiamo alcun calcolo: resta il comportamento CSS di
+// default (position:absolute, apertura verso il basso, max-height statico dove già
+// presente inline).
 function positionCdropMenu(menu, trigger){
   const triggerRect = trigger.getBoundingClientRect();
   const viewportH = window.innerHeight || document.documentElement.clientHeight;
