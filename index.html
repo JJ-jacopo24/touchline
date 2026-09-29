@@ -5368,11 +5368,15 @@ document.addEventListener('change', function(e){
     return; // no full re-render needed
   }
 
-  // draft raggruppamento: label / torneo
+  // draft raggruppamento: label / note. Niente render(): nessun altro elemento del modale
+  // dipende da questi due campi (verificato, unico altro uso: la lettura al salvataggio) —
+  // stesso trattamento già riservato a rgGol/rgAssist sotto, stessa ragione (evitare di
+  // ricostruire il modale, e quindi il pulsante che l'utente sta ancora toccando, mentre
+  // il tocco è in corso: bug trovato il 29-09-2026, la X restava senza effetto se toccata
+  // con la tastiera ancora aperta su Etichetta/Note).
   if(t.dataset.draft){
     const draft = ensureRaggruppamentoDraft();
     draft[t.dataset.draft] = t.value;
-    render();
     return;
   }
   // draft raggruppamento: vista squadra (gol)
