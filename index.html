@@ -26,11 +26,11 @@
     --gold:#F0A400;
     --gold-soft:#FCEACB;
     --gold-mid:#F6D68A;
-    /* PROVVISORIO (27-09-2026): usato solo dal pulsante "Esci senza salvare" (.btn.warn), per
-       distinguerlo dal dorato sopra (già usato per accento di marca, compleanno, stella preferita —
-       non un tono di attenzione coerente, vedi indagine dello stesso giorno). Da confermare/unificare
-       quando si implementano i 4 toni dei popup (attenzione/informazione/errore/conferma), già in
-       programma: potrebbe sostituirlo o restare, non deciso qui. */
+    /* NON USATO (28-09-2026): nato per il pulsante "Esci senza salvare" (.btn.warn) di un popup di
+       conferma sui modali, poi tolto per una decisione di prodotto (vedi LEGGIMI.md). Lasciato qui
+       apposta per il futuro lavoro sui 4 toni dei popup (attenzione/informazione/errore/conferma), già
+       in programma: in quel lavoro va riusato (dopo aver confermato il giallo) o rimosso — non deciso
+       qui. Nessun punto dell'app lo usa oggi. */
     --attenzione:#FFC107;
     --ritardo:#D9691C;
     --ritardo-soft:#F7DCC4;
@@ -190,7 +190,7 @@
   .btn.secondary{background:var(--chalk-dim);color:var(--ink);}
   .btn.outline{background:transparent;border:1.5px solid var(--pitch);color:var(--pitch);}
   .btn.danger{background:var(--red);color:#fff;}
-  .btn.warn{background:var(--attenzione);color:#5C3D0E;}
+  .btn.warn{background:var(--attenzione);color:#5C3D0E;}  /* non usato oggi, vedi il commento su --attenzione */
   .btn.ghost{background:transparent;color:var(--pitch-deep);padding:11px 14px;min-height:44px;font-weight:600;}
   .btn.block{width:100%;}
   .btn.sm{padding:10px 14px;font-size:14px;min-height:40px;}
@@ -3480,18 +3480,6 @@ let histGuardWanted = false;       // guardia del doppio Indietro: una voce sott
                                     // passare dalla cronologia — non supportato su Safari/iPhone al 22-09-2026,
                                     // richiede un gradino a sé con verifica sul telefono vero.
 let histExitTimer = null;          // finestra del doppio Indietro (EXIT_WINDOW_MS)
-// Indietro sui modali con dati non salvati (decisione di prodotto, 27-09-2026, sostituisce il primo
-// disegno "avviso poi secondo Indietro conferma": quel disegno duplicava lo stesso limite di Chromium
-// della guardia Home, ma sul percorso PRINCIPALE d'uso — premere Indietro due volte era il modo VOLUTO
-// di confermare. Ora un modale con dati modificati apre un vero popup di conferma (showConfirm): resta
-// protetto dallo stesso motore dei popup, mai render()/renderModal() finché non tocchi un pulsante
-// (#popup-zone e #modal-zone sono zone DOM separate, non serve altro). Indietro su QUESTO popup
-// equivale ad Annulla, come per ogni altro popup (closeTopLayer lo tratta per primo, sempre). Nessuno
-// stato da riarmare: modaleCorrenteModificato() si ricontrolla da capo a ogni Indietro, niente finestre
-// di tempo. Attivo solo per i tipi in MODALI_GUARDIA_INDIETRO — sottoinsieme di
-// MODALI_CON_DATI_NON_SALVATI (renderModal()): per ora solo questi due, verificati a fondo (test +
-// telefono); gli altri si aggiungono qui solo dopo una verifica separata su ciascuno.
-const MODALI_GUARDIA_INDIETRO = ['edit-player', 'raggruppamento'];
 let histApiAccodata = false;       // apiObbligatoria richiesta mentre syncHistory() era bloccata (histHold
                                     // o un go() già in corso): non va persa, si onora alla prima sync utile
                                     // (blocco 2b-3, correzione: prima veniva scartata in un no-op silenzioso)
@@ -3683,10 +3671,7 @@ function closeTopLayer(opz){
   // S1 (blocco 2b): qualunque popup si chiude così, avviso/conferma inclusi — MAI onConfirm
   // (Indietro su un showConfirm equivale a "Annulla", come il tasto close-popup già fa).
   if(UI.popup){ UI.popup = null; renderPopup(); return 'popup'; }
-  if(UI.modal){
-    if(modaleRichiedeConferma(opz)) return 'modale-conferma';
-    UI.modal = null; hideExitToast(); render(); return 'modale';
-  }
+  if(UI.modal){ UI.modal = null; render(); return 'modale'; }
   if(UI.screen !== 'home'){
     const eraScheda = UI.screen==='team' && UI.view!=='calendario';   // da una scheda diversa dal Calendario si torna prima al Calendario
     backOneLevel();
@@ -3707,17 +3692,11 @@ window.addEventListener('popstate', function(){
   // Indietro dell'utente: si chiudono i livelli oltre la profondità raggiunta (più di uno
   // se il browser ha saltato una voce); la sync resta ferma finché non ha finito
   histHold++;
-  let guardiaConsumata = false, modaleConfermaRichiesta = false;
+  let guardiaConsumata = false;
   try{
     while(historyLayers() > depth){
       const chiuso = closeTopLayer();
       if(chiuso === 'guardia') guardiaConsumata = true;
-      // conferma sui modali: UI.modal resta valorizzato apposta (non chiuso), quindi historyLayers()
-      // lo conta ancora e il ciclo continuerebbe a "vederlo" come un livello da chiudere nello STESSO
-      // Indietro (stesso problema, già risolto altrove, della promozione dei popup in coda: qui la
-      // soluzione è fermare subito il ciclo, non rimandare come per i popup, perché non c'è nulla
-      // da promuovere dopo, solo da NON richiudere due volte)
-      if(chiuso === 'modale-conferma'){ modaleConfermaRichiesta = true; break; }
       if(!chiuso) break;
     }
   }finally{ histHold--; }
@@ -3735,7 +3714,6 @@ window.addEventListener('popstate', function(){
   // nel 2b-1) — rimosso, non è mai stata una vera rete di sicurezza. Se una futura modifica a
   // closeTopLayer()/a questo ciclo cambiasse l'ordine di chiusura, andrebbe rivalutato da capo.
   if(guardiaConsumata) showExitToast();
-  if(modaleConfermaRichiesta) apriConfermaUscitaModale();
   // coda dei popup (blocco 2b-4): la promozione durante il ciclo qui sopra è volutamente bloccata
   // (promuoviPopupAccodato() controlla histHold, sempre >0 mentre il ciclo gira) — altrimenti il
   // popup appena promosso da closeTopLayer() farebbe subito risalire historyLayers() e il ciclo,
@@ -3792,68 +3770,6 @@ function scheduleGuardRearm(){
 function showExitToast(){
   mostraAvvisoIndietro('Premi ancora Indietro per uscire');
   scheduleGuardRearm();
-}
-// Letto dal DOM del modale in cima (nome/valore, data-role+data-pid per i campi per-giocatore come
-// steppers e caselle, o .cdrop[data-value] per le tendine/pillole personalizzate): stringa comparabile,
-// non un valore semantico. Limite noto: un futuro tipo di campo che non rientri in questi tre pattern
-// non verrebbe letto (vedi il controllo statico dedicato nei test).
-function leggiFormSemplice(form){
-  if(!form) return '';
-  const parti = [];
-  form.querySelectorAll('input,textarea').forEach(function(el){
-    const chiave = el.name || (el.dataset.role ? el.dataset.role + ':' + (el.dataset.pid || '') : '');
-    if(!chiave) return;
-    parti.push(chiave + '=' + (el.type === 'checkbox' ? el.checked : el.value));
-  });
-  form.querySelectorAll('.cdrop[data-value]').forEach(function(el){
-    const chiave = el.dataset.field || el.dataset.att3select || el.dataset.attselect || '';
-    if(!chiave) return;
-    parti.push(chiave + '=' + el.dataset.value);
-  });
-  parti.sort();
-  return parti.join('|');
-}
-// Istantanea presa una sola volta per apertura (memorizzata su UI.modal.payload, mai ricalcolata:
-// sopravvive a un render() come il draft di raggruppamento): il valore di partenza con cui confrontare
-// lo stato attuale a ogni Indietro. 'raggruppamento' ha già un oggetto (draft) sempre aggiornato: si
-// confronta quello; gli altri si leggono dal form via leggiFormSemplice().
-function creaSnapshotModaleSeServe(){
-  if(!UI.modal || !MODALI_GUARDIA_INDIETRO.includes(UI.modal.type)) return;
-  const payload = UI.modal.payload;
-  if(payload._snapshotIniziale !== undefined) return;
-  payload._snapshotIniziale = (UI.modal.type === 'raggruppamento')
-    ? JSON.stringify(payload.draft || null)
-    : leggiFormSemplice(document.querySelector('#modal-zone form'));
-}
-function modaleCorrenteModificato(){
-  if(!UI.modal || !MODALI_GUARDIA_INDIETRO.includes(UI.modal.type)) return false;
-  const payload = UI.modal.payload;
-  if(payload._snapshotIniziale === undefined) return false;   // istantanea non ancora presa: non si può dire, tratta come non modificato
-  const attuale = (UI.modal.type === 'raggruppamento')
-    ? JSON.stringify(payload.draft || null)
-    : leggiFormSemplice(document.querySelector('#modal-zone form'));
-  return attuale !== payload._snapshotIniziale;
-}
-// Chiamata da closeTopLayer() quando c'è un modale in cima: vero se è tra i tipi con guardia ed è
-// davvero modificato — senza toccare nessuno stato (si ricontrolla da capo a ogni Indietro, niente
-// finestre di tempo da riarmare). "<" (opz.senzaGuardia) salta sempre questo controllo, come già per
-// la guardia Home: è un'azione esplicita, non ambigua come il tasto Indietro.
-function modaleRichiedeConferma(opz){
-  if(opz && opz.senzaGuardia) return false;
-  if(!UI.modal || !MODALI_GUARDIA_INDIETRO.includes(UI.modal.type)) return false;
-  return modaleCorrenteModificato();
-}
-// Chiamata (fuori dal ciclo di popstate, a histHold già tornato 0: syncHistory() dentro renderPopup()
-// non farebbe nulla se chiamata prima) quando Indietro trova un modale modificato: un vero popup di
-// conferma, stesso motore di ogni altro popup (mai render()/renderModal() qui — solo #popup-zone,
-// verificato anche da un controllo statico nei test). Indietro su questo popup equivale ad Annulla
-// (closeTopLayer tratta ogni popup così, per primo): resti sul modale, dati intatti. Solo toccando
-// "Esci senza salvare" il modale si chiude per davvero (stesso render() già ammesso in quel momento).
-function apriConfermaUscitaModale(){
-  showConfirm('Le modifiche non salvate andranno perse. Uscire comunque?', function(){
-    UI.modal = null;
-    render();
-  }, {confirmLabel: 'Esci senza salvare', warn: true});
 }
 // Con A1, histGuardWanted è già true dal boot (non più "false finché non tocchi"): riarmare la guardia e
 // recuperare le altre voci rimaste in sospeso su pagina non toccata (es. un modale aperto già al boot,
@@ -3927,7 +3843,7 @@ function showAlert(message){
 }
 function showConfirm(message, onConfirm, opts){
   opts = opts || {};
-  apriPopup({kind:'confirm', message, onConfirm, danger:!!opts.danger, warn:!!opts.warn, confirmLabel: opts.confirmLabel || 'Conferma'});
+  apriPopup({kind:'confirm', message, onConfirm, danger:!!opts.danger, confirmLabel: opts.confirmLabel || 'Conferma'});
 }
 // Info (ⓘ) toccata DENTRO un modale: si mostra come popup, non con openModal('info'),
 // che sostituirebbe il modale attivo e distruggerebbe form, note e bozze. Come
@@ -3973,7 +3889,7 @@ function renderPopup(){
     </div>`;
   } else {
     const confirmBtn = p.kind==='confirm'
-      ? `<button class="btn ${p.danger?'danger':(p.warn?'warn':'')}" style="flex:1;" data-action="confirm-popup">${escapeHtml(p.confirmLabel)}</button>`
+      ? `<button class="btn ${p.danger?'danger':''}" style="flex:1;" data-action="confirm-popup">${escapeHtml(p.confirmLabel)}</button>`
       : '';
     const cancelBtn = p.kind==='confirm'
       ? `<button class="btn secondary" style="flex:1;" data-action="close-popup">Annulla</button>`
@@ -4080,7 +3996,6 @@ function renderModal(){
   zone.innerHTML = `<div class="overlay"${bloccaSfondo ? '' : ' data-action="overlay-close"'}>
     <div class="${modalClass}" data-stop="1">${inner}</div>
   </div>`;
-  creaSnapshotModaleSeServe();
 }
 
 function modalDay(){
