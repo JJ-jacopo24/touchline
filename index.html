@@ -697,6 +697,10 @@
   <div id="print-area"></div>
 
 <script>
+const BUILD_ID = "d477378593";
+window.BUILD_ID = BUILD_ID;
+const APP_VERSION = "0.1";
+window.APP_VERSION = APP_VERSION;
 /* =========================================================
    STATO & PERSISTENZA
    ========================================================= */
@@ -1156,14 +1160,111 @@ function validaBackup(d){
   };
   for(const k of LISTE_BACKUP_OBBLIGATORIE){ const m = controlla(k, true); if(m) return {ok:false, motivo:m}; }
   for(const k of LISTE_BACKUP_FACOLTATIVE){ const m = controlla(k, false); if(m) return {ok:false, motivo:m}; }
-  return {ok:true, motivo:''};
+  const c = controllaCampiDati(d, false);
+  return c.ok ? {ok:true, motivo:''} : {ok:false, motivo:c.motivo};
+}
+
+/* ---- Controllo dei VALORI (non solo della forma) ----
+   Id, date, orari, numeri, stati e link finiscono in attributi HTML e nel testo senza
+   escape in molti punti dei render: un valore ostile in un backup importato diventerebbe
+   codice. Qui si ammettono solo i formati che l'app stessa produce. Un valore assente
+   (undefined) o null è sempre ammesso; vuoto ('') solo dove l'app lo usa (torneoId, date).
+   normalizza=false (import): ogni valore fuori formato fa rifiutare tutto il file.
+   normalizza=true (loadState): i campi opzionali fuori formato vengono ripuliti sul posto
+   (data/orario/durata/link -> null, numeri -> 0, stato -> 'NP'); id e date degli impegni
+   NON si possono ripulire (sono chiavi di collegamento e di ordinamento) e restano
+   problemi. Non guarda nomi, note e testo libero: quelli passano già da escapeHtml. */
+const RE_ID_DATI = /^[A-Za-z0-9_-]{1,64}$/;
+const RE_DATA_DATI = /^\d{4}-\d{2}-\d{2}$/;
+const RE_ORARIO_DATI = /^([01]\d|2[0-3]):[0-5]\d$/;
+const RE_LINK_DATI = /^https?:\/\/[^\s"'<>]+$/i;
+const STATI_DATI = ['', 'P', 'R', 'A', 'NC', 'NP'];
+// Dominio con eventuale percorso, senza schema (es. "goo.gl/x"): il form permette di salvare
+// un link così, quindi un backup legittimo può contenerne.
+const RE_DOMINIO_DATI = /^[A-Za-z0-9.-]+\.[A-Za-z]{2,}(\/[^\s"'<>]*)?$/;
+// Prima del controllo (import e loadState): toglie gli spazi ai bordi e aggiunge https:// ai
+// mapsLink senza schema che sembrano un dominio. Modifica sul posto. Tutto il resto (link con
+// schema non valido, testo qualunque) lo lascia com'è: lo giudica controllaCampiDati.
+function normalizzaLinkMaps(d){
+  if(d===null || typeof d!=='object' || !Array.isArray(d.events)) return;
+  d.events.forEach(e => {
+    if(e===null || typeof e!=='object' || typeof e.mapsLink!=='string') return;
+    const t = e.mapsLink.trim();
+    if(RE_LINK_DATI.test(t)) e.mapsLink = t;
+    else if(RE_DOMINIO_DATI.test(t)) e.mapsLink = 'https://' + t;
+  });
+}
+function controllaCampiDati(d, normalizza){
+  const problemi = [];
+  let normalizzati = 0;
+  const NO = {};   // "nessun valore di ripiego": il campo non è ripulibile
+  const str = (re, v) => typeof v==='string' && re.test(v);
+  const isId = v => str(RE_ID_DATI, v);
+  const isIdOVuoto = v => v==='' || isId(v);
+  const isData = v => v==='' || str(RE_DATA_DATI, v);
+  const isOrario = v => str(RE_ORARIO_DATI, v);
+  const isLink = v => v==='' || str(RE_LINK_DATI, v);
+  const isNum = v => typeof v==='number' && Number.isFinite(v);
+  const isStato = v => STATI_DATI.indexOf(v) >= 0;
+  const campo = (o, k, ok, path, fb, nullable) => {
+    const v = o[k];
+    if(v===undefined || (v===null && nullable!==false) || ok(v)) return;
+    if(normalizza && fb!==NO){ o[k] = fb; normalizzati++; } else problemi.push(path + '.' + k);
+  };
+  const oggetto = x => x!==null && typeof x==='object' && !Array.isArray(x);
+  const lista = k => Array.isArray(d[k]) ? d[k].filter(oggetto) : [];
+  campo(d, 'primaryTeamId', isId, 'primaryTeamId', NO);
+  lista('seasons').forEach((s, i) => campo(s, 'id', isId, 'seasons[' + i + ']', NO));
+  lista('teams').forEach((t, i) => { const p = 'teams[' + i + ']'; campo(t, 'id', isId, p, NO); campo(t, 'seasonId', isId, p, NO); });
+  lista('players').forEach((x, i) => { const p = 'players[' + i + ']'; campo(x, 'id', isId, p, NO); campo(x, 'dataNascita', isData, p, null); });
+  lista('assignments').forEach((a, i) => {
+    const p = 'assignments[' + i + ']';
+    campo(a, 'id', isId, p, NO); campo(a, 'teamId', isId, p, NO); campo(a, 'playerId', isId, p, NO);
+    campo(a, 'dataIngresso', isData, p, null); campo(a, 'dataUscita', isData, p, null);
+  });
+  lista('tournaments').forEach((t, i) => { const p = 'tournaments[' + i + ']'; campo(t, 'id', isId, p, NO); campo(t, 'teamId', isId, p, NO); });
+  lista('events').forEach((e, i) => {
+    const p = 'events[' + i + ']';
+    campo(e, 'id', isId, p, NO); campo(e, 'teamId', isId, p, NO); campo(e, 'date', isData, p, NO, false);
+    campo(e, 'torneoId', isIdOVuoto, p, NO);
+    campo(e, 'orario', isOrario, p, null); campo(e, 'durata', isNum, p, null); campo(e, 'mapsLink', isLink, p, null);
+    if(oggetto(e.presenze)) Object.keys(e.presenze).forEach(pid => {
+      if(!isId(pid)) problemi.push(p + '.presenze[chiave]');
+      else campo(e.presenze, pid, isStato, p + '.presenze', 'NP', false);
+    });
+    ['giocatori', 'squadra'].forEach(m => {
+      if(!oggetto(e[m])) return;
+      Object.keys(e[m]).forEach(pid => {
+        if(!isId(pid)) { problemi.push(p + '.' + m + '[chiave]'); return; }
+        const g = e[m][pid];
+        if(!oggetto(g)) return;
+        const q = p + '.' + m + '[' + pid + ']';
+        campo(g, 'stato', isStato, q, 'NP', false);
+        ['gol', 'assist', 'giallo'].forEach(f => campo(g, f, isNum, q, 0, false));
+      });
+    });
+  });
+  return { ok: problemi.length===0, motivo: problemi.length ? 'valore non valido in ' + problemi[0] : '', normalizzati };
 }
 
 const STORAGE_KEY = 'gestione-presenze-calcio-v1';
+// dati di loadState rifiutati dal controllo dei valori: messi da parte, mai cancellati
+const DATI_SCARTATI_KEY = 'touchline-dati-scartati';
 function loadState(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
-    if(raw){ STATE = Object.assign(STATE, migrateState(JSON.parse(raw))); }
+    if(raw){
+      const dati = JSON.parse(raw);
+      normalizzaLinkMaps(dati);
+      const c =(dati!==null && typeof dati==='object' && !Array.isArray(dati)) ? controllaCampiDati(dati, true) : {ok:false, motivo:'non è un oggetto'};
+      if(c.ok){ STATE = Object.assign(STATE, migrateState(dati)); }
+      else{
+        // dati con id/date non validi (manomessi o corrotti): non si caricano e non si perdono,
+        // si copiano una sola volta in una chiave a parte (il primo salvataggio riscrive quella principale)
+        console.error('Dati salvati non caricati: ' + c.motivo);
+        try{ if(localStorage.getItem(DATI_SCARTATI_KEY)===null) localStorage.setItem(DATI_SCARTATI_KEY, raw); }catch(e2){}
+      }
+    }
   }catch(e){ console.error('Errore lettura dati salvati sul dispositivo', e); }
   if(!STATE.meta) STATE.meta = { updatedAt: null, schemaVersion: CURRENT_SCHEMA_VERSION };
   // per chi aveva già dati prima del promemoria: fissa ora la data di partenza,
@@ -2615,6 +2716,7 @@ function importBackupFile(file){
     let nuovo, dataBackup;
     try{
       const grezzo = JSON.parse(evt.target.result);
+      normalizzaLinkMaps(grezzo);   // mapsLink senza schema: aggiunge https:// invece di rifiutare il file
       if(!validaBackup(grezzo).ok){ showAlert(TESTO_IMPORT_NON_BACKUP); return; }
       const data = migrateState(grezzo);
       dataBackup = data.meta && data.meta.updatedAt;
@@ -2654,6 +2756,7 @@ function modalBackup(){
       <input type="file" accept="application/json" data-action="import-backup-file" style="display:none;">
     </label>
     <p class="muted">⚠️ Importare un backup sostituisce tutti i dati presenti ora su questo dispositivo. Prima di procedere l'app ti mostra cosa c'è nel backup e cosa c'è sul telefono, e ti segnala se il backup è più vecchio.</p>
+    <p class="muted" style="margin-top:8px;font-size:12px;">Versione app: ${escapeHtml(APP_VERSION)}</p>
     </div>
   `;
 }
@@ -5722,6 +5825,31 @@ function init(){
   render();
 }
 init();
+
+// Service worker: registrazione difensiva (blocco 2 PWA, gradino 2), rimandata
+// all'evento 'load' (pratica standard: non competere con il caricamento della
+// pagina stessa). In file:// (app.html aperto come file singolo) il controllo
+// è sul PROTOCOLLO, non su isSecureContext: file:// risulta un contesto
+// sicuro per specifica (verificato: window.isSecureContext è true su
+// file://), ma il Service Worker richiede comunque uno schema http/https --
+// senza questo controllo il tentativo partirebbe comunque e fallirebbe ogni
+// volta ("The URL protocol of the current origin ('null') is not
+// supported"). Con http/https un fallimento vero (es. sw.js introvabile o
+// rotto) finisce in console.warn: visibile solo a chi apre DevTools, mai
+// come errore della pagina. Nessuno scope esplicito: il default (la
+// cartella di sw.js) resta confinato a dove sw.js viene servito, mai più
+// ampio.
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    if(location.protocol !== 'http:' && location.protocol !== 'https:') return;
+    try{
+      navigator.serviceWorker.register('sw.js').catch(function(e){
+        console.warn('Registrazione del service worker non riuscita: ' + (e && e.message));
+      });
+    }
+    catch(e){ console.warn('Registrazione del service worker non riuscita: ' + (e && e.message)); }
+  });
+}
 </script>
 </body>
 </html>
