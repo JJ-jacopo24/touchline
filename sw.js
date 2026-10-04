@@ -17,7 +17,7 @@
    questo file precarica più il proprio modello: vedi il commento su
    BUILD_ID in build.js.
    ========================================================= */
-const BUILD_ID = "e26f6d8266";
+const BUILD_ID = "219515b474";
 const CACHE_NAME = 'touchline-cache-' + BUILD_ID;
 const PREFISSO_CACHE = 'touchline-';
 
