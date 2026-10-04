@@ -175,6 +175,7 @@
     font-size:17px;margin-bottom:12px;
   }
   .muted{color:var(--ink-soft);font-size:13.5px;line-height:1.5;}
+  .field-error{color:var(--red);font-size:13.5px;line-height:1.5;margin-top:4px;}
   .empty-state{
     text-align:center;padding:36px 16px;color:var(--ink-soft);
   }
@@ -698,9 +699,9 @@
   <div id="print-area"></div>
 
 <script>
-const BUILD_ID = "219515b474";
+const BUILD_ID = "fb87fbbfda";
 window.BUILD_ID = BUILD_ID;
-const APP_VERSION = "0.4";
+const APP_VERSION = "1.0";
 window.APP_VERSION = APP_VERSION;
 /* =========================================================
    STATO & PERSISTENZA
@@ -1648,6 +1649,24 @@ function findSoprannomeConflict(pid, soprannome, contextTeamId){
   return `Il soprannome "${soprannome.trim()}" è già usato da ${other.nome} ${other.cognome}, che condivide una squadra con questo giocatore. Scegline uno diverso.`;
 }
 
+// Whitelist caratteri per nome/cognome/soprannome (decisione di prodotto): solo lettere di
+// qualunque alfabeto, spazio, apostrofo dritto e tipografico (i telefoni sostituiscono l'uno
+// con l'altro durante la digitazione), trattino breve e i trattini lunghi en/em dash (alcune
+// tastiere sostituiscono automaticamente un doppio trattino con uno di questi, bloccando
+// altrimenti il salvataggio senza una causa visibile per il mister). Niente punto fermo né
+// virgola: decisione di prodotto, non tecnica.
+const RE_NOME_VALIDO = /^[\p{L} '’–—-]*$/u;
+function caratteriNomeValidi(v){ return RE_NOME_VALIDO.test(v); }
+function campoNomeObbligatorioValido(v){ return v.trim()!=='' && caratteriNomeValidi(v); }
+function campoNomeFacoltativoValido(v){ return caratteriNomeValidi(v); }
+// Unica fonte di verità sulla validità del form, usata sia per il rendering iniziale del
+// modale sia per il controllo live mentre si scrive: restano sempre d'accordo.
+function playerFormValoriValidi(nome, cognome, soprannome){
+  return campoNomeObbligatorioValido(nome)
+    && campoNomeFacoltativoValido(cognome)
+    && campoNomeFacoltativoValido(soprannome);
+}
+
 // Regola "identità duplicata": due giocatori non possono avere lo stesso
 // nome+cognome se hanno anche lo stesso soprannome (incluso il caso in cui
 // entrambi lo lascino vuoto). Ambito globale su tutta l'anagrafica, perché
@@ -1838,14 +1857,26 @@ function removeFromTeamConfirmed(assignmentId, dataUscita){
   const a = STATE.assignments.find(x=>x.id===assignmentId);
   if(a){ a.dataUscita = dataUscita || todayStr(); saveState(); }
 }
+// Toglie da uno stato (STATE o un backup appena costruito in import) ogni riferimento a un
+// insieme di id giocatore: le loro assegnazioni e le loro voci negli eventi (presenze/
+// giocatori/squadra). Condivisa tra l'eliminazione definitiva di un giocatore e lo scarto in
+// import di un giocatore con nome non valido (opzione B), così un domani un nuovo tipo di
+// riferimento all'id giocatore si aggiorna in un solo punto, non in due da tenere allineati.
+function rimuoviRiferimentiGiocatori(stato, ids){
+  const set = ids instanceof Set ? ids : new Set(ids);
+  if(set.size===0) return;
+  stato.assignments = stato.assignments.filter(a => !set.has(a.playerId));
+  stato.events.forEach(e => {
+    set.forEach(pid => {
+      if(e.presenze) delete e.presenze[pid];
+      if(e.giocatori) delete e.giocatori[pid];
+      if(e.squadra) delete e.squadra[pid];
+    });
+  });
+}
 function deletePlayerPermanently(pid){
   STATE.players = STATE.players.filter(p=>p.id!==pid);
-  STATE.assignments = STATE.assignments.filter(a=>a.playerId!==pid);
-  STATE.events.forEach(e=>{
-    if(e.presenze) delete e.presenze[pid];
-    if(e.giocatori) delete e.giocatori[pid];
-    if(e.squadra) delete e.squadra[pid];
-  });
+  rimuoviRiferimentiGiocatori(STATE, [pid]);
   saveState();
 }
 function saveTournamentData(tid, data){
@@ -2678,8 +2709,9 @@ function messaggioConfermaImport(backup, telefono){
   return apertura + '\n\n' + bloccoRiepilogo('Nel backup:', backup, conTornei) + '\n\n' + bloccoRiepilogo('Sul telefono ora:', telefono, conTornei) +
     '\n\nQuello che hai ora sul telefono sparirà. Se non ne hai un backup, non potrai recuperarlo.';
 }
-function messaggioImportato(s){
-  return 'Backup importato: ' + pluraleIt(s.players.length,'giocatore','giocatori') + ', ' + pluraleIt(s.teams.length,'squadra','squadre') + ', ' + pluraleIt(s.events.length,'impegno','impegni') + '.';
+function messaggioImportato(s, scartati){
+  const base = 'Backup importato: ' + pluraleIt(s.players.length,'giocatore','giocatori') + ', ' + pluraleIt(s.teams.length,'squadra','squadre') + ', ' + pluraleIt(s.events.length,'impegno','impegni') + '.';
+  return scartati>0 ? base + ' ' + pluraleIt(scartati,'giocatore scartato','giocatori scartati') + ': nome mancante o con caratteri non ammessi.' : base;
 }
 
 // Costruisce il nuovo stato dai dati del backup (già validati e migrati). Nessun effetto.
@@ -2697,6 +2729,25 @@ function costruisciStatoImport(data){
   };
   LISTE_BACKUP_OBBLIGATORIE.concat(LISTE_BACKUP_FACOLTATIVE).forEach(k => { nuovo[k] = Array.isArray(data[k]) ? data[k] : []; });
   return nuovo;
+}
+
+// Opzione B (decisione di prodotto): un backup importato può contenere giocatori con un nome
+// non valido (vuoto, di tipo sbagliato, o con caratteri fuori dalla whitelist scritta in uso
+// dal modulo "Modifica giocatore" — RE_NOME_VALIDO in state.js) se arrivato da prima di quel
+// controllo, o da un'altra app. Il file non viene rifiutato: solo quei giocatori vengono
+// scartati, con la stessa pulizia a cascata di deletePlayerPermanently (rimuoviRiferimentiGiocatori
+// in state.js), per non lasciare riferimenti a un id che non esiste più in anagrafica.
+// cognome/soprannome NON sono controllati qui (solo il nome è obbligatorio): un giocatore può
+// entrare con un cognome o soprannome "sporco" se il nome è valido — per quel caso il modulo
+// "Modifica giocatore" mostra il messaggio d'errore già all'apertura (vedi render-modal.js).
+function rimuoviGiocatoriNomeNonValido(nuovo){
+  const invalidi = new Set(
+    nuovo.players.filter(p => typeof p.nome!=='string' || !campoNomeObbligatorioValido(p.nome)).map(p => p.id)
+  );
+  if(invalidi.size===0) return 0;
+  nuovo.players = nuovo.players.filter(p => !invalidi.has(p.id));
+  rimuoviRiferimentiGiocatori(nuovo, invalidi);
+  return invalidi.size;
 }
 
 // Ripristina la memoria (STATE e campi UI) com'erano prima dell'import. Il disco non è mai
@@ -2717,7 +2768,7 @@ function ripristinaDopoImport(vecchioSTATE, vecchiaUI){
 // ha le protezioni di L2: k non supera le voci contigue con lo stesso URL (Navigation API) né la profondità
 // massima e, se la Navigation API manca, NON si tenta nessun go(): la cronologia si riallinea e restano
 // gli Indietro "a vuoto" (apiObbligatoria).
-function eseguiImport(nuovo){
+function eseguiImport(nuovo, scartati){
   historyHold();
   try{
     flushPendingSave();                            // modifiche ancora in coda: prima su disco, così entrano nello stato da ripristinare
@@ -2737,7 +2788,7 @@ function eseguiImport(nuovo){
     if(!scriviStato()){ fallito(TESTO_IMPORT_SPAZIO); return; }
     // riuscito: la selezione ricordata non deve puntare ai vecchi id
     saveLastSelection({seasonId:null, teamId:null});
-    showAlert(messaggioImportato(nuovo));
+    showAlert(messaggioImportato(nuovo, scartati));
   }finally{
     historyRelease({apiObbligatoria:true});
   }
@@ -2747,7 +2798,7 @@ function importBackupFile(file){
   const reader = new FileReader();
   reader.onerror = () => { showAlert(TESTO_IMPORT_ILLEGGIBILE); };
   reader.onload = (evt) => {
-    let nuovo, dataBackup;
+    let nuovo, dataBackup, scartati;
     try{
       const grezzo = JSON.parse(evt.target.result);
       normalizzaLinkMaps(grezzo);   // mapsLink senza schema: aggiunge https:// invece di rifiutare il file
@@ -2755,14 +2806,15 @@ function importBackupFile(file){
       const data = migrateState(grezzo);
       dataBackup = data.meta && data.meta.updatedAt;
       nuovo = costruisciStatoImport(data);
+      scartati = rimuoviGiocatoriNomeNonValido(nuovo);
     }catch(err){
       showAlert(TESTO_IMPORT_NON_BACKUP); return;
     }
     // telefono senza dati: niente da perdere, nessuna conferma (flusso "importa il tuo backup")
-    if(!hasAnyData()){ eseguiImport(nuovo); return; }
+    if(!hasAnyData()){ eseguiImport(nuovo, scartati); return; }
     showConfirm(
       messaggioConfermaImport(riepilogoDati(nuovo, dataBackup), riepilogoDati(STATE, STATE.meta && STATE.meta.updatedAt)),
-      () => eseguiImport(nuovo),
+      () => eseguiImport(nuovo, scartati),
       {danger:true, confirmLabel:'Sostituisci i dati'}
     );
   };
@@ -2999,13 +3051,24 @@ function renderStatsView(team){
   `;
 }
 
+// Neutralizza l'injection di formula nei fogli di calcolo: Excel/Sheets interpretano come
+// formula una cella che INIZIA per =, +, -, @ (o TAB/CR), potendo eseguire comandi o
+// richiamare risorse esterne quando il mister apre il CSV. L'apostrofo dritto anteposto
+// forza il testo semplice e non compare a video. Rete di sicurezza indipendente dal blocco
+// in scrittura sui campi nome/cognome/soprannome: copre anche i nomi già presenti in un
+// backup importato prima che quel blocco esistesse.
+const RE_FORMULA_CSV = /^[=+\-@\t\r]/;
+function neutralizzaFormulaCsv(v){
+  return RE_FORMULA_CSV.test(v) ? "'" + v : v;
+}
+
 // Costruisce il testo del file CSV: intestazioni + righe, separatore ";" (lo
 // standard che Excel in italiano si aspetta), BOM UTF-8 iniziale (necessario
 // perché Excel riconosca correttamente le lettere accentate), celle tra
 // virgolette solo se contengono ";"/virgolette/a capo.
 function statsTableToCsv(columns, sorted){
   const csvCell = v=>{
-    v = String(v);
+    v = neutralizzaFormulaCsv(String(v));
     return /[;"\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v;
   };
   const headerRow = columns.map(c=>csvCell(c.label)).join(';');
@@ -3434,21 +3497,35 @@ function modalEditPlayer(){
   const pid = UI.modal.payload.pid;
   const pl = pid ? getPlayer(pid) : null;
   const forTeam = UI.modal.payload.forTeam;
+  const nomeV = pl?pl.nome:'';
+  const cognomeV = pl?(pl.cognome||''):'';
+  const soprannomeV = pl?(pl.soprannome||''):'';
+  const salvaDisabilitato = !playerFormValoriValidi(nomeV, cognomeV, soprannomeV);
+  // Il messaggio d'errore riflette il valore GIA' presente all'apertura (non solo dopo un
+  // tocco dell'utente): un dato arrivato "sporco" da un vecchio import (opzione B: solo il
+  // nome è obbligatorio, cognome/soprannome non ripuliti) deve essere segnalato subito,
+  // altrimenti il mister vede Salva disabilitato senza nessuna spiegazione visibile.
+  const erroreVisibile = v => caratteriNomeValidi(v) ? 'none' : 'block';
   return `
     <div class="modal-head"><h2>${pl?'Modifica giocatore':'Nuovo giocatore'}</h2><button data-action="close-modal">${icon('close')}</button></div>
     <div class="modal-scroll-body">
     <form data-form="save-player" data-pid="${pid||''}" data-forteam="${forTeam?'1':''}">
       <div class="row2">
-        <div class="field"><label>Nome</label><input type="text" name="nome" value="${pl?escapeHtml(pl.nome):''}" required></div>
-        <div class="field"><label>Cognome</label><input type="text" name="cognome" value="${pl?escapeHtml(pl.cognome||''):''}"></div>
+        <div class="field"><label>Nome</label><input type="text" name="nome" value="${escapeHtml(nomeV)}" required>
+          <div class="field-error" id="player-nome-error" style="display:${erroreVisibile(nomeV)};">Solo lettere, spazi, apostrofi e trattini.</div>
+        </div>
+        <div class="field"><label>Cognome</label><input type="text" name="cognome" value="${escapeHtml(cognomeV)}">
+          <div class="field-error" id="player-cognome-error" style="display:${erroreVisibile(cognomeV)};">Solo lettere, spazi, apostrofi e trattini.</div>
+        </div>
       </div>
       <div class="field"><label>Data di nascita (facoltativa) ${infoIcon('data_nascita')}</label>
         <input type="date" name="dataNascita" value="${pl?pl.dataNascita||'':''}">
       </div>
       <div class="field"><label>Come lo chiami (facoltativo) ${infoIcon('soprannome')}</label>
-        <input type="text" name="soprannome" value="${pl?escapeHtml(pl.soprannome||''):''}" placeholder="es. il nome con cui lo riconosci in campo">
+        <input type="text" name="soprannome" value="${escapeHtml(soprannomeV)}" placeholder="es. il nome con cui lo riconosci in campo">
+        <div class="field-error" id="player-soprannome-error" style="display:${erroreVisibile(soprannomeV)};">Solo lettere, spazi, apostrofi e trattini.</div>
       </div>
-      <button type="submit" class="btn block">Salva</button>
+      <button type="submit" class="btn block"${salvaDisabilitato?' disabled':''}>Salva</button>
     </form>
     </div>
   `;
@@ -5636,6 +5713,18 @@ document.addEventListener('input', function(e){
       if(hintEl) hintEl.textContent = hint ? `⚠️ ${hint}` : '';
     }
   }
+  // Controllo live caratteri ammessi in nome/cognome/soprannome del modale giocatore: solo
+  // manipolazione diretta del DOM (messaggio ed eventuale disabled del pulsante Salva), mai
+  // render() da un form con dati non salvati (regola ferma del progetto).
+  if(t.name==='nome' || t.name==='cognome' || t.name==='soprannome'){
+    const form = t.closest('form');
+    if(form && form.dataset.form==='save-player'){
+      const errEl = document.getElementById('player-' + t.name + '-error');
+      if(errEl) errEl.style.display = caratteriNomeValidi(t.value) ? 'none' : 'block';
+      const btn = form.querySelector('button[type="submit"]');
+      if(btn) btn.disabled = !playerFormValoriValidi(fv(form,'nome'), fv(form,'cognome'), fv(form,'soprannome'));
+    }
+  }
 });
 
 document.addEventListener('change', function(e){
@@ -5825,6 +5914,11 @@ document.addEventListener('submit', function(e){
   if(type==='save-player'){
     const pid = form.dataset.pid || null;
     const forTeam = form.dataset.forteam === '1';
+    // Invio bloccato come il click sul pulsante disabilitato, ma SOLO per la whitelist dei
+    // caratteri: il caso "nome vuoto/di soli spazi" resta gestito più sotto con un avviso
+    // esplicito (showAlert), comportamento preesistente e già testato (test_scheda_nome.js),
+    // perché lo spazio è un carattere ammesso e non attiverebbe nessun messaggio sotto il campo.
+    if(!caratteriNomeValidi(fv(form,'nome')) || !caratteriNomeValidi(fv(form,'cognome')) || !caratteriNomeValidi(fv(form,'soprannome'))) return;
     const data = {
       nome: fv(form,'nome').trim(),
       cognome: fv(form,'cognome').trim(),
