@@ -697,9 +697,9 @@
   <div id="print-area"></div>
 
 <script>
-const BUILD_ID = "d477378593";
+const BUILD_ID = "e26f6d8266";
 window.BUILD_ID = BUILD_ID;
-const APP_VERSION = "0.2";
+const APP_VERSION = "0.3";
 window.APP_VERSION = APP_VERSION;
 /* =========================================================
    STATO & PERSISTENZA
@@ -1250,6 +1250,12 @@ function controllaCampiDati(d, normalizza){
 const STORAGE_KEY = 'gestione-presenze-calcio-v1';
 // dati di loadState rifiutati dal controllo dei valori: messi da parte, mai cancellati
 const DATI_SCARTATI_KEY = 'touchline-dati-scartati';
+// copia grezza (byte per byte, PRIMA di migrateState) presa solo quando sta per avvenire una
+// migrazione vera (v < CURRENT_SCHEMA_VERSION): una sola copia, sovrascritta ogni volta. Se la
+// scrittura fallisce (es. quota piena) la migrazione prosegue comunque, senza avviso al mister
+// -- try/catch LOCALE, deliberatamente separato da quello esterno di loadState: un errore qui
+// non deve mai impedire l'assegnazione di STATE subito dopo.
+const COPIA_PRE_MIGRAZIONE_KEY = 'touchline-copia-pre-migrazione';
 function loadState(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -1257,7 +1263,13 @@ function loadState(){
       const dati = JSON.parse(raw);
       normalizzaLinkMaps(dati);
       const c =(dati!==null && typeof dati==='object' && !Array.isArray(dati)) ? controllaCampiDati(dati, true) : {ok:false, motivo:'non è un oggetto'};
-      if(c.ok){ STATE = Object.assign(STATE, migrateState(dati)); }
+      if(c.ok){
+        const v = (dati.meta && typeof dati.meta.schemaVersion==='number') ? dati.meta.schemaVersion : 0;
+        if(v < CURRENT_SCHEMA_VERSION){
+          try{ localStorage.setItem(COPIA_PRE_MIGRAZIONE_KEY, raw); }catch(e2){}
+        }
+        STATE = Object.assign(STATE, migrateState(dati));
+      }
       else{
         // dati con id/date non validi (manomessi o corrotti): non si caricano e non si perdono,
         // si copiano una sola volta in una chiave a parte (il primo salvataggio riscrive quella principale)
@@ -1320,6 +1332,26 @@ function saveBackupInfo(patch){
   try{
     localStorage.setItem(BACKUP_INFO_KEY, JSON.stringify(Object.assign(loadBackupInfo(), patch)));
   }catch(e){ /* localStorage non disponibile: il promemoria semplicemente non compare */ }
+}
+// touchline-update-info: diagnostica/supporto per l'avviso "Aggiornamento
+// disponibile" (blocco 2 PWA). lastPostponedAt: quando il mister ha premuto
+// "Più tardi" (scritta dal gradino 3). seenVersion: versione gia' vista dopo
+// un aggiornamento REALMENTE avvenuto (reload con il nuovo service worker in
+// controllo) -- non ancora scritta in questo gradino, dove "Aggiorna" è solo
+// un log in console, nessun aggiornamento vero; arriva con il gradino 4/5
+// insieme al reload vero e all'avviso "App aggiornata".
+const UPDATE_INFO_KEY = 'touchline-update-info';
+function loadUpdateInfo(){
+  try{
+    const raw = localStorage.getItem(UPDATE_INFO_KEY);
+    const info = raw ? JSON.parse(raw) : {};
+    return info && typeof info==='object' ? info : {};
+  }catch(e){ return {}; }
+}
+function saveUpdateInfo(patch){
+  try{
+    localStorage.setItem(UPDATE_INFO_KEY, JSON.stringify(Object.assign(loadUpdateInfo(), patch)));
+  }catch(e){ /* localStorage non disponibile: l'informazione semplicemente non si salva */ }
 }
 function hasAnyData(){
   return ['players','seasons','teams','events','tournaments'].some(k => Array.isArray(STATE[k]) && STATE[k].length>0);
@@ -1867,6 +1899,7 @@ function render(){
   renderBottomnav();
   renderModal();
   renderPopup();
+  mostraAvvisoAggiornamentoSeInAttesa(); // un aggiornamento rilevato mentre un modale era aperto: mostralo ora che si è chiuso (render-update.js)
   syncHistory();   // solo history.pushState/go: mai un render, vedi "CRONOLOGIA E TASTO INDIETRO"
 }
 
@@ -3546,13 +3579,28 @@ function modalEditTournament(){
    dell'app, non tenuta a mano:
      livelli = guardia (0 o 1, vedi sotto) + schermata (Home 0; Stagioni, Anagrafica, Statistiche generali 1;
                lista Squadre 2; squadra 3) + scheda (+1 in squadra se non è il Calendario)
+               + banner "Aggiornamento disponibile" (blocco 2 PWA: bannerAggiornamentoAperto,
+               render-update.js — mai insieme al modale, vedi richiediAvvisoAggiornamento())
                + modale + popup (avviso/conferma/info — S1, blocco 2b: un popup è un livello come gli
                altri, non solo 'info' come prima)
    syncHistory() (in fondo a render() e renderPopup()) riporta la cronologia a quel
    numero: pushState per le voci che mancano, history.go() per quelle in eccesso.
-   Non chiama MAI render(): solo history.*.
+   Non chiama MAI render(): solo history.*. Il banner, essendo fuori da qualunque render(),
+   chiama syncHistory() da sé quando compare/sparisce fuori da un render() (richiediAvvisoAggiornamento(),
+   rimandaAggiornamento()); quando compare DENTRO un render() (rinvio alla chiusura di un modale,
+   mostraAvvisoAggiornamentoSeInAttesa()), basta la syncHistory() finale di quel render().
    Il tasto Indietro (popstate) e il pulsante "<" usano la stessa closeTopLayer(),
-   che chiude un livello alla volta: prima l'info, poi il modale, poi la schermata.
+   che chiude un livello alla volta: prima il popup, poi il banner "Aggiornamento disponibile"
+   (stesso effetto di "Più tardi", rimandaAggiornamento() — ignorato se un "Aggiorna" è già in
+   corso: aggiornamentoInCorso), poi il modale, poi la schermata. Stessa priorità per Esc.
+   LIMITE "pagina mai toccata" esteso al banner (stessa natura del limite A1 sulla guardia, vedi
+   histGuardWanted sotto): se il banner compare prima che la pagina sia mai stata toccata, la sua
+   voce può non essere spinta (il tetto A1 concede una sola voce "gratis", di solito già spesa
+   dalla guardia) — un Indietro in quella finestra chiude comunque il banner (closeTopLayer() lo
+   trova per primo) ma, consumando l'unica voce reale disponibile, consuma anche la guardia nello
+   stesso gesto: il mister vede sia il banner sparire sia "Premi ancora Indietro per uscire",
+   invece dei due eventi separati. Si risana da solo al primo tocco reale (qualunque, anche sullo
+   sfondo scuro del banner): catturaVociInSospeso() (sotto) recupera la voce mancante.
    Ogni voce porta il "documento" (ep) che l'ha creata: dopo un ricaricamento quelle
    vecchie risultano estranee e non si toccano con go() (Indietro "a vuoto").
    ========================================================= */
@@ -3591,6 +3639,7 @@ function historyLayers(){
   let n = HIST_SCREEN_DEPTH[UI.screen] || 0;
   if(histGuardWanted) n++;                                  // guardia del doppio Indietro (una voce sotto la Home)
   if(UI.screen==='team' && UI.view!=='calendario') n++;   // la scheda iniziale è il Calendario: le altre sono UN livello sopra (cambiare tra loro non aggiunge voci)
+  if(bannerAggiornamentoAperto) n++;   // banner "Aggiornamento disponibile" (render-update.js): mai insieme a UI.modal
   if(UI.modal) n++;
   if(UI.popup) n++;   // S1 (blocco 2b): qualunque popup (avviso/conferma/info) è un livello, non solo 'info'
   return n;
@@ -3774,6 +3823,14 @@ function closeTopLayer(opz){
   // S1 (blocco 2b): qualunque popup si chiude così, avviso/conferma inclusi — MAI onConfirm
   // (Indietro su un showConfirm equivale a "Annulla", come il tasto close-popup già fa).
   if(UI.popup){ UI.popup = null; renderPopup(); return 'popup'; }
+  // banner "Aggiornamento disponibile": stesso effetto di "Più tardi" (rimandaAggiornamento(),
+  // render-update.js). Durante un "Aggiorna" già in corso (aggiornamentoInCorso) resta IGNORATO:
+  // nessuno strato si chiude, la voce torna identica dopo la sync finale del ciclo chiamante.
+  if(bannerAggiornamentoAperto){
+    if(aggiornamentoInCorso) return null;
+    rimandaAggiornamento();
+    return 'banner-aggiornamento';
+  }
   if(UI.modal){ UI.modal = null; render(); return 'modale'; }
   if(UI.screen !== 'home'){
     const eraScheda = UI.screen==='team' && UI.view!=='calendario';   // da una scheda diversa dal Calendario si torna prima al Calendario
@@ -4014,6 +4071,8 @@ document.addEventListener('keydown', function(e){
   // S1 (blocco 2b): Esc chiude qualunque popup, avviso/conferma inclusi (non solo 'info' come prima),
   // per coerenza con Indietro — su un showConfirm equivale ad Annulla, mai onConfirm.
   if(e.key==='Escape' && UI.popup){ UI.popup = null; renderPopup(); return; }
+  // banner "Aggiornamento disponibile": stessa priorità e stesso effetto di Indietro (closeTopLayer()).
+  if(e.key==='Escape' && bannerAggiornamentoAperto){ if(!aggiornamentoInCorso) rimandaAggiornamento(); return; }
   if(e.key==='Escape' && UI.modal){ closeModal(); return; }
 
   const tag = (e.target.tagName||'').toLowerCase();
@@ -4677,6 +4736,158 @@ function eventSummary(e){
 }
 
 /* =========================================================
+   AVVISO "AGGIORNAMENTO DISPONIBILE" (blocco 2 PWA, gradini 3-4-"Indietro/Esc")
+   -----------------------------------------------------------
+   Nodo DOM diretto, creazione/rimozione dirette su document.body: MAI
+   render() (stesso principio di mostraAvvisoIndietro in render-modal.js).
+   Bloccante come showAlert/showConfirm: riusa le classi .overlay/.modal
+   vere, ma con z-index 45 (sotto il 50 dei popup reali) cosi' la conferma
+   di exportBackup(), innescata da "Fai un backup prima", compare SOPRA
+   questo avviso e non sotto. Chi lo mostra/nasconde e con quale
+   ricontrollo: events.js (registrazione del service worker).
+
+   Rinvio se un modale e' gia' aperto (gradino 4, bug trovato nell'indagine:
+   con z-index 45 < 50 dei modali/popup, l'avviso creato sotto un modale
+   gia' aperto non bloccherebbe nulla finche' quel modale resta aperto).
+   richiediAvvisoAggiornamento() e' quello che events.js deve chiamare al
+   posto di mostraAvvisoAggiornamento() diretta: se UI.modal e' valorizzato
+   si limita a ricordare che c'e' un aggiornamento in attesa,
+   mostraAvvisoAggiornamentoSeInAttesa() (chiamata da render(), vedi
+   render-core.js) lo mostra al primo render() utile dopo che il modale si
+   chiude -- render() e' un punto di passaggio garantito, lo attraversa
+   anche closeModal().
+
+   Indietro (Android) ed Esc (PC) col banner aperto: STESSO effetto di "Più
+   tardi" (rimandaAggiornamento(), unica funzione condivisa con il clic --
+   mai un percorso duplicato), tramite closeTopLayer()/l'handler Esc in
+   render-modal.js, che lo trattano come un livello della cronologia in piu'
+   (bannerAggiornamentoAperto, letto da historyLayers()). Ignorato durante
+   un "Aggiorna" gia' in corso (aggiornamentoInCorso): nessuno strato si
+   chiude, la voce torna identica dopo la sync finale del ciclo chiamante.
+   Limite "pagina mai toccata" ereditato da A1: vedi il commento sulla
+   sezione CRONOLOGIA E TASTO INDIETRO in render-modal.js.
+   ========================================================= */
+let aggiornamentoInAttesaDiMostrare = false;
+// Specchio DOM<->cronologia (gradino "Indietro/Esc"): true/false SOLO dentro
+// mostraAvvisoAggiornamento()/nascondiAvvisoAggiornamento(), nello stesso respiro della
+// manipolazione del nodo -- mai altrove, cosi' non puo' divergere dalla presenza reale del nodo.
+// Letto da historyLayers() (render-modal.js): il banner e' un livello come modale/popup.
+let bannerAggiornamentoAperto = false;
+function richiediAvvisoAggiornamento(){
+  if(UI.modal){ aggiornamentoInAttesaDiMostrare = true; return; }
+  mostraAvvisoAggiornamento();
+  // fuori da render(): nessuno chiamerebbe altrimenti syncHistory() per questa nuova voce
+  // (il caso "rinviato alla chiusura di un modale", mostraAvvisoAggiornamentoSeInAttesa(),
+  // e' invece chiamato DENTRO render(): basta la sua syncHistory() finale, vedi render-core.js)
+  syncHistory();
+}
+function mostraAvvisoAggiornamentoSeInAttesa(){
+  if(aggiornamentoInAttesaDiMostrare && !UI.modal){
+    aggiornamentoInAttesaDiMostrare = false;
+    mostraAvvisoAggiornamento();
+  }
+}
+function mostraAvvisoAggiornamento(){
+  if(document.getElementById('touchline-update-overlay')) return; // gia' mostrato
+  const overlay = document.createElement('div');
+  overlay.id = 'touchline-update-overlay';
+  overlay.className = 'overlay';
+  overlay.style.zIndex = '45';
+  overlay.setAttribute('role', 'alertdialog');
+  overlay.setAttribute('aria-modal', 'true');
+
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML =
+    '<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:16px;">' +
+      '<span style="font-size:22px;line-height:1;color:var(--gold);flex-shrink:0;">' + icon('sync') + '</span>' +
+      '<div style="min-width:0;">' +
+        '<strong style="display:block;color:var(--pitch-deep);font-size:16px;margin-bottom:4px;">Aggiornamento disponibile</strong>' +
+        '<span style="font-size:14px;color:var(--ink-soft);">C\'è una nuova versione di Touchline. Puoi aggiornare subito o più tardi: i dati restano sempre dove sono.</span>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-bottom:8px;">' +
+      '<button class="btn" style="flex:1;" data-action="update-now">Aggiorna</button>' +
+      '<button class="btn secondary" style="flex:1;" data-action="update-postpone">Più tardi</button>' +
+    '</div>' +
+    '<button class="btn ghost" style="width:100%;" data-action="update-backup-first">Fai un backup prima</button>';
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  bannerAggiornamentoAperto = true;
+}
+function nascondiAvvisoAggiornamento(){
+  const el = document.getElementById('touchline-update-overlay');
+  if(el) el.remove();
+  bannerAggiornamentoAperto = false;
+}
+// Indietro (popstate)/Esc con il banner aperto: STESSO effetto di "Più tardi", stessa funzione
+// (nessun percorso duplicato) -- chiamata sia dal clic diretto sia da closeTopLayer()/dall'handler
+// Esc (render-modal.js). La chiamata a syncHistory() qui dentro e' sicura in ENTRAMBI i contesti:
+// durante il clic gira per davvero; durante il ciclo di closeTopLayer() nel gestore popstate
+// (histHold>0) syncHistory() si auto-sospende (vedi la sua guardia histHold>0||histPending) e non
+// fa nulla -- la riconciliazione vera arriva comunque dalla sync finale di quel ciclo.
+function rimandaAggiornamento(){
+  if(aggiornamentoInCorso) return false;   // stessa guardia gia' su "Più tardi": mai a meta' di un reload in corso
+  saveUpdateInfo({lastPostponedAt: new Date().toISOString()});
+  nascondiAvvisoAggiornamento();
+  syncHistory();
+  return true;
+}
+// Stato "in corso" (gradino 4): dal click su "Aggiorna" fino alla conferma di
+// controllerchange (o al timeout difensivo), i tre pulsanti restano disabilitati
+// -- manipolazione diretta del DOM sui pulsanti gia' presenti, mai una
+// ricostruzione del nodo (perderebbe lo stato bloccante per un istante).
+function impostaAggiornamentoInCorsoUI(inCorso){
+  const overlay = document.getElementById('touchline-update-overlay');
+  if(!overlay) return;
+  overlay.querySelectorAll('[data-action="update-now"],[data-action="update-postpone"],[data-action="update-backup-first"]').forEach(function(btn){
+    btn.disabled = inCorso;
+  });
+  const btnAggiorna = overlay.querySelector('[data-action="update-now"]');
+  if(btnAggiorna) btnAggiorna.textContent = inCorso ? 'Aggiornamento in corso…' : 'Aggiorna';
+}
+const TESTO_AGGIORNAMENTO_FALLITO = "L'aggiornamento non è riuscito. Riprova, oppure scegli \"Più tardi\": i dati non sono in alcun modo a rischio.";
+/* =========================================================
+   AVVISO "APP AGGIORNATA" (blocco 2 PWA, gradino 5)
+   -----------------------------------------------------------
+   Nodo DOM diretto, creazione/rimozione dirette su document.body: MAI
+   render() (stesso principio di mostraAvvisoIndietro in render-modal.js e
+   del banner "Aggiornamento disponibile" in render-update.js). NON
+   bloccante (a differenza del banner del gradino 3/4: nessun .overlay,
+   nessuno sfondo scuro) e visivamente SEPARATO sia dal banner bloccante
+   sia dal vecchio toast nero/verde scuro "Premi ancora Indietro per
+   uscire" (quello resta com'è, un ridisegno è lavoro a sé, non questo).
+   Colori reali dell'app: card bianca come .modal, icona oro, testo
+   verde pitch-deep. Scompare da sola dopo APP_UPDATE_DONE_TOAST_MS, o
+   subito al tocco sul toast stesso. Chi la richiama: events.js, init(),
+   confrontando seenVersion prima/dopo (mai al primissimo avvio).
+   ========================================================= */
+const APP_UPDATE_DONE_TOAST_MS = 6000;
+let appUpdateDoneToastTimer = null;
+function nascondiAvvisoAppAggiornata(){
+  clearTimeout(appUpdateDoneToastTimer);
+  const el = document.getElementById('touchline-update-done-toast');
+  if(el) el.remove();
+}
+function mostraAvvisoAppAggiornata(versione){
+  nascondiAvvisoAppAggiornata();
+  const toast = document.createElement('div');
+  toast.id = 'touchline-update-done-toast';
+  toast.setAttribute('role', 'status');
+  toast.setAttribute('aria-live', 'polite');
+  toast.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);' +
+    'bottom:calc(28px + env(safe-area-inset-bottom, 0px));max-width:88vw;' +
+    'background:#fff;color:var(--pitch-deep);border-radius:14px;padding:12px 18px;' +
+    'display:flex;align-items:center;gap:10px;box-shadow:0 4px 14px rgba(0,0,0,.25);' +
+    'z-index:40;font-size:14px;font-weight:600;cursor:pointer;';
+  toast.innerHTML =
+    '<span style="font-size:18px;line-height:1;color:var(--gold);flex-shrink:0;">' + icon('sync') + '</span>' +
+    '<span>App aggiornata (versione ' + escapeHtml(versione) + ')</span>';
+  toast.addEventListener('click', nascondiAvvisoAppAggiornata);
+  document.body.appendChild(toast);
+  appUpdateDoneToastTimer = setTimeout(nascondiAvvisoAppAggiornata, APP_UPDATE_DONE_TOAST_MS);
+}
+/* =========================================================
    VISTA TORNEI
    ========================================================= */
 // Riga torneo: estratta a parte perché riusata sia per i tornei della
@@ -5321,6 +5532,29 @@ document.addEventListener('click', function(e){
     case 'show-overlap-warning': showAlert(`Si sovrappone a: ${actionEl.dataset.label}`); break;
     case 'export-backup': exportBackup(); break;
     case 'export-stats-csv': exportStatsCsv(); break;
+    case 'update-now': {
+      if(aggiornamentoInCorso) break; // guardia: ignora i click ripetuti durante l'attesa
+      const worker = swRegistration && swRegistration.waiting; // lettura fresca, non il worker catturato alla rilevazione
+      if(!worker){ nascondiAvvisoAggiornamento(); break; } // stato cambiato nel frattempo: nulla da attivare
+      aggiornamentoInCorso = true;
+      impostaAggiornamentoInCorsoUI(true);
+      clearTimeout(timeoutAggiornamento);
+      timeoutAggiornamento = setTimeout(function(){
+        // controllerchange non è mai arrivato (gradino 4, scelta prudenziale: mai
+        // un'attesa senza uscita visibile per il mister, stesso principio di
+        // NORMALIZE_TIMEOUT_MS in cleanReload)
+        aggiornamentoInCorso = false;
+        impostaAggiornamentoInCorsoUI(false);
+        showAlert(TESTO_AGGIORNAMENTO_FALLITO);
+      }, AGGIORNAMENTO_TIMEOUT_MS);
+      worker.postMessage({type: 'SKIP_WAITING'});
+      break;
+    }
+    case 'update-postpone': rimandaAggiornamento(); break; // stessa funzione di Indietro/Esc sul banner (render-modal.js)
+    case 'update-backup-first':
+      if(aggiornamentoInCorso) break;
+      exportBackup();
+      break;
   }
 });
 
@@ -5821,8 +6055,22 @@ function init(){
   // chiusura di 'set-name' in ogni caso (closeModal(), render-modal.js), quindi è già,
   // di fatto, "l'introduzione è già stata vista" — nessun nuovo campo.
   if(!STATE.userName && !STATE.hasSeenInfoTip){ UI.modal = {type:'set-name', payload:{}}; }
+  // seenVersion (gradino 4): scritta ad ogni avvio in cui APP_VERSION è diversa dall'ultima
+  // vista -- cattura un aggiornamento REALMENTE avvenuto indipendentemente da come è arrivato
+  // (click su "Aggiorna", o il browser che ha sostituito il worker da solo mentre l'app era
+  // chiusa): se la versione letta ora è diversa da quella salvata, un aggiornamento c'è stato
+  // per definizione (vale anche al primissimo avvio in assoluto, quando non c'è ancora nessuna
+  // versione salvata: stabilisce semplicemente la base di partenza).
+  // seenPrima letta UNA volta sola: serve sia per decidere se riscrivere la chiave, sia (gradino
+  // 5) per decidere se mostrare "App aggiornata" -- solo se c'era GIÀ una versione registrata
+  // (mai al primissimo avvio in assoluto, dove seenPrima è undefined) ed è diversa da quella
+  // corrente.
+  const seenPrima = loadUpdateInfo().seenVersion;
+  if(seenPrima !== APP_VERSION){ saveUpdateInfo({seenVersion: APP_VERSION}); }
+  const mostraAppAggiornata = seenPrima !== undefined && seenPrima !== APP_VERSION;
   normalizeHistory({boot:true});   // voci di cronologia lasciate da un ricaricamento: prima del render, così la sync le trova già gestite
   render();
+  if(mostraAppAggiornata){ mostraAvvisoAppAggiornata(APP_VERSION); }
 }
 init();
 
@@ -5839,12 +6087,76 @@ init();
 // come errore della pagina. Nessuno scope esplicito: il default (la
 // cartella di sw.js) resta confinato a dove sw.js viene servito, mai più
 // ampio.
+// Stato del gradino 4 (skipWaiting -> controllerchange -> cleanReload), module-scope:
+// swRegistration: riferimento salvato per leggere registration.waiting FRESCO al click su
+// "Aggiorna" (non il worker catturato al momento della rilevazione, che potrebbe essere stato
+// superato da uno ancora più nuovo nel frattempo).
+// aggiornamentoInCorso: guardia nostra, separata da histReloading interna a cleanReload() --
+// ignora i click ripetuti su "Aggiorna" e fa sì che il listener controllerchange (registrato
+// una volta sola, vive per tutta la sessione) ignori un cambio di controller non originato da
+// un nostro click.
+// timeoutAggiornamento / AGGIORNAMENTO_TIMEOUT_MS: mai un'attesa senza uscita visibile per il
+// mister se controllerchange non arriva mai (stesso principio di NORMALIZE_TIMEOUT_MS).
+let swRegistration = null;
+let aggiornamentoInCorso = false;
+let timeoutAggiornamento = null;
+const AGGIORNAMENTO_TIMEOUT_MS = 9000;
+
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
     if(location.protocol !== 'http:' && location.protocol !== 'https:') return;
     try{
-      navigator.serviceWorker.register('sw.js').catch(function(e){
+      navigator.serviceWorker.register('sw.js').then(function(registration){
+        swRegistration = registration;
+
+        // Avviso "Aggiornamento disponibile" (gradino 3): due casi distinti.
+        // 1) un worker nuovo ha gia' finito di installarsi in una visita
+        //    precedente ed e' li' in attesa (pattern standard: la sola
+        //    presenza di registration.waiting a questo punto implica gia'
+        //    un worker precedente, altrimenti non ci sarebbe nulla da
+        //    attendere -- va dritto da installed ad activating).
+        if(registration.waiting){ richiediAvvisoAggiornamento(); }
+
+        // 2) un worker nuovo inizia a installarsi ORA, mentre l'app e' gia'
+        //    aperta. navigator.serviceWorker.controller distingue un VERO
+        //    aggiornamento dalla primissima installazione: assente = prima
+        //    volta, nulla da aggiornare, nessun avviso.
+        registration.addEventListener('updatefound', function(){
+          const installing = registration.installing;
+          if(!installing) return;
+          installing.addEventListener('statechange', function(){
+            if(installing.state === 'installed' && navigator.serviceWorker.controller){
+              richiediAvvisoAggiornamento();
+            }
+          });
+        });
+
+        // Controllo proattivo: il browser controlla da solo gli aggiornamenti
+        // alla navigazione verso una pagina nello scope, ma qui non c'e' mai
+        // una nuova navigazione (pagina singola, puo' restare aperta per
+        // giorni) -- senza questo, un mister che non chiude mai l'app non
+        // verrebbe mai ricontrollato.
+        registration.update().catch(function(){});
+        document.addEventListener('visibilitychange', function(){
+          if(document.visibilityState === 'visible') registration.update().catch(function(){});
+        });
+      }).catch(function(e){
         console.warn('Registrazione del service worker non riuscita: ' + (e && e.message));
+      });
+
+      // gradino 4: il nuovo worker, attivato da skipWaiting() + clients.claim() (sw.js), prende
+      // davvero il controllo di QUESTA pagina -- a quel punto (non prima) si può ricaricare.
+      navigator.serviceWorker.addEventListener('controllerchange', function(){
+        if(!aggiornamentoInCorso) return; // non originato da un nostro click su "Aggiorna"
+        clearTimeout(timeoutAggiornamento);
+        const ok = cleanReload();
+        if(!ok){
+          // cleanReload() ha già mostrato il suo avviso (il salvataggio in sospeso non è
+          // riuscito): il banner resta a schermo, si torna semplicemente utilizzabile
+          aggiornamentoInCorso = false;
+          impostaAggiornamentoInCorsoUI(false);
+        }
+        // se ok, cleanReload() ricarica da solo tra poco: nessun altro intervento qui
       });
     }
     catch(e){ console.warn('Registrazione del service worker non riuscita: ' + (e && e.message)); }
