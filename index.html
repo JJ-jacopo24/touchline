@@ -18,6 +18,7 @@
     --pitch-deep:#04552B;
     --pitch:#00843D;
     --pitch-light:#22A85C;
+    --pitch-soft:#DCEFE1;      /* promosso dal valore fisso già usato in .badge.green: sfondo del tono "conferma" dei popup */
     --chalk:#F6F4EC;
     --chalk-dim:#EAE6D8;
     --ink:#16231B;
@@ -26,12 +27,11 @@
     --gold:#F0A400;
     --gold-soft:#FCEACB;
     --gold-mid:#F6D68A;
-    /* NON USATO (28-09-2026): nato per il pulsante "Esci senza salvare" (.btn.warn) di un popup di
-       conferma sui modali, poi tolto per una decisione di prodotto (vedi LEGGIMI.md). Lasciato qui
-       apposta per il futuro lavoro sui 4 toni dei popup (attenzione/informazione/errore/conferma), già
-       in programma: in quel lavoro va riusato (dopo aver confermato il giallo) o rimosso — non deciso
-       qui. Nessun punto dell'app lo usa oggi. */
+    /* tono "attenzione" dei popup (showAlert): il giallo nato per .btn.warn (mai arrivato in
+       produzione, vedi LEGGIMI.md) è stato confermato e riusato qui, con un fondo dedicato
+       (non --gold-soft, già associato alla stella piena). */
     --attenzione:#FFC107;
+    --attenzione-soft:#FFF3CD;
     --ritardo:#D9691C;
     --ritardo-soft:#F7DCC4;
     --red:#B3432B;
@@ -191,7 +191,7 @@
   .btn.secondary{background:var(--chalk-dim);color:var(--ink);}
   .btn.outline{background:transparent;border:1.5px solid var(--pitch);color:var(--pitch);}
   .btn.danger{background:var(--red);color:#fff;}
-  .btn.warn{background:var(--attenzione);color:#5C3D0E;}  /* non usato oggi, vedi il commento su --attenzione */
+  .btn.warn{background:var(--attenzione);color:#5C3D0E;}  /* .btn.warn non usato oggi (--attenzione invece sì, vedi .modal.alert-attenzione) */
   .btn.ghost{background:transparent;color:var(--pitch-deep);padding:11px 14px;min-height:44px;font-weight:600;}
   .btn.block{width:100%;}
   .btn.sm{padding:10px 14px;font-size:14px;min-height:40px;}
@@ -359,7 +359,7 @@
   }
   .badge.blue{background:var(--blue-soft);color:var(--blue);}
   .badge.purple{background:var(--purple-soft);color:var(--purple);}
-  .badge.green{background:#DCEFE1;color:var(--pitch-deep);}
+  .badge.green{background:var(--pitch-soft);color:var(--pitch-deep);}
   .badge.ritardo{background:var(--ritardo-soft);color:#5C3D0E;}
 
   /* ---- Forms ---- */
@@ -500,6 +500,7 @@
   .stepper{display:inline-flex;align-items:center;gap:5px;}
   .stepper .goal-input{width:40px;padding:8px 2px;}
   .stepper-btn{
+    touch-action:manipulation;
     width:36px;height:36px;border-radius:8px;flex-shrink:0;
     background:var(--chalk-dim);color:var(--pitch-deep);font-weight:800;font-size:18px;
     border:1.5px solid var(--line);
@@ -532,6 +533,28 @@
   .modal.modal-split{display:flex;flex-direction:column;overflow:hidden;}
   .modal.modal-split .modal-head{position:static;transform:none;will-change:auto;z-index:auto;flex-shrink:0;}
   .modal-scroll-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
+  /* 4 toni di showAlert (attenzione/errore/informazione/conferma), prima tutti identici:
+     sfondo "soft" + bordo sinistro nel colore principale del tono, stessa convenzione già
+     usata da .badge e .delete-icon-btn (colore principale per testo/bordo, variante -soft
+     per lo sfondo). Solo colore, nessuna icona (decisione di prodotto): il messaggio resta
+     sempre leggibile per intero, vedi renderPopup() in render-modal.js. */
+  .modal.alert-attenzione{background:var(--attenzione-soft);border-left:4px solid var(--attenzione);}
+  .modal.alert-errore{background:var(--red-soft);border-left:4px solid var(--red);}
+  .modal.alert-informazione{background:var(--blue-soft);border-left:4px solid var(--blue);}
+  .modal.alert-conferma{background:var(--pitch-soft);border-left:4px solid var(--pitch-deep);}
+  /* toast "Premi ancora Indietro per uscire" (mostraAvvisoIndietro, render-modal.js): forma
+     invariata (pillola centrata, non cliccabile, nessuna auto-chiusura a timer — vedi il
+     commento su EXIT_WINDOW_MS/guardia-persistente), solo colore. Prima un nero-con-tinta-
+     verde ad hoc (rgba(20,30,25,.94)+#fff), stonato col resto dell'app: ora il tono
+     "attenzione" appena introdotto per showAlert, perché "stai per uscire" è un avviso di
+     cautela, non una conferma di successo come il toast "App aggiornata" (quello resta la
+     card bianca a sé, vedi render-update-done.js). */
+  .exit-toast{
+    position:fixed;left:50%;transform:translateX(-50%);bottom:calc(28px + env(safe-area-inset-bottom, 0px));
+    max-width:88vw;padding:12px 20px;border-radius:24px;background:var(--attenzione-soft);
+    color:var(--ink);border-left:4px solid var(--attenzione);font-size:15px;
+    text-align:center;z-index:90;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.3);
+  }
   @keyframes slideup{from{transform:translateY(16px);opacity:0;}to{transform:translateY(0);opacity:1;}}
   /* z-index esplicito: senza, un .cdrop più avanti nel DOM (es. le tendine
      dei campi) vince lo stacking sullo sticky header non appena vi scorre
@@ -686,7 +709,6 @@
     .pcard-note{margin:22px 24px;padding:14px 16px;background:#FCEACB;border-radius:10px;font-size:12.5px;color:#5C3D0E;white-space:pre-wrap;line-height:1.5;}
     .pcard-footer{padding:14px 22px;text-align:center;font-size:10px;letter-spacing:.04em;color:#999;border-top:1px solid #EFECE0;text-transform:uppercase;}
   }
-  /* pubblicazione di prova 0.4: nessun effetto visivo, serve solo a cambiare BUILD_ID */
 </style>
 </head>
 <body>
@@ -699,9 +721,9 @@
   <div id="print-area"></div>
 
 <script>
-const BUILD_ID = "fb87fbbfda";
+const BUILD_ID = "9d5d09e922";
 window.BUILD_ID = BUILD_ID;
-const APP_VERSION = "1.0";
+const APP_VERSION = "1.1";
 window.APP_VERSION = APP_VERSION;
 /* =========================================================
    STATO & PERSISTENZA
@@ -821,6 +843,21 @@ const ICONS = {
   sync: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 13.66-5.66L20 8"/><path d="M20 4v4h-4"/><path d="M20 12a8 8 0 0 1-13.66 5.66L4 16"/><path d="M4 20v-4h4"/></svg>',
   calendarToday: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/><circle cx="12" cy="15.5" r="2.2"/></svg>',
   trash: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>',
+  compass: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polygon points="15.5 8.5 13 13 8.5 15.5 11 11 15.5 8.5"/></svg>',
+  // vetrina "Guida rapida": apertura rapida di un giorno (pressione prolungata sul calendario)
+  bolt: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 4 14 11 14 10 22 20 9 13 9 13 2"/></svg>',
+  // vetrina "Guida rapida": uscire dall'app (doppio Indietro)
+  doorExit: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
+  // vetrina "Guida rapida": scorciatoie da tastiera (solo Computer)
+  keyboard: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><line x1="5.5" y1="10" x2="8" y2="10"/><line x1="10.5" y1="10" x2="13" y2="10"/><line x1="15.5" y1="10" x2="18" y2="10"/><line x1="5.5" y1="14" x2="18" y2="14"/></svg>',
+  // vetrina "Guida rapida": cartellino rosso automatico alla seconda ammonizione.
+  // Rettangolo inclinato (invece di dritto, come idbadge) per leggersi subito come
+  // un cartellino e non come un tesserino.
+  redcard: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2" transform="rotate(8 12 12)"/></svg>',
+  // vetrina "Guida rapida": esito automatico (Vittoria/Sconfitta/Pareggio). Bandierina
+  // neutra invece di "trophy" (già associata ai tornei nell'app): qui riguarda l'esito
+  // di una singola mini-partita, non una classifica.
+  flag: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="21" x2="5" y2="3"/><path d="M5 4h13l-3 4 3 4H5"/></svg>',
   // Sostituiscono ★/☆/🔔/✏️/📲/✕: stesso stile monocromo a stroke="currentColor"
   // delle altre icone, tranne starFilled (vedi sotto).
   starOutline: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>',
@@ -847,6 +884,32 @@ const ICONS = {
   // come smartphone a 19px rispetto al solo rettangolo con una riga.
   phone: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><line x1="10.5" y1="5" x2="13.5" y2="5"/><line x1="9.5" y1="18.5" x2="14.5" y2="18.5"/></svg>',
   close: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>',
+  // conversione emoji residue (secondo giro, dopo stella/campana/matita/telefono/✕).
+  // clock/note/floppy: nessun colore legato al significato, monocrome come le altre
+  // icone di sempre. cardYellow/cardRed/warningTriangle/mapPin/assist: colore FISSO
+  // (non currentColor) perché qui il colore fa parte del significato (decisione di
+  // Jacopo) — cardYellow/cardRed riusano la sagoma (rettangolo ruotato) già scelta
+  // per "redcard" (icona concettuale della vetrina "Guida rapida"), qui con un
+  // riempimento vero invece che solo contorno. warningTriangle riusa lo stesso hex
+  // di --gold già dichiarato (ma probabilmente senza effetto) da .warn-tri su ⚠️.
+  clock: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+  note: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l3 3v15H6Z"/><path d="M15 3v3h3"/><line x1="8.5" y1="10" x2="15.5" y2="10"/><line x1="8.5" y1="13.5" x2="15.5" y2="13.5"/><line x1="8.5" y1="17" x2="13" y2="17"/></svg>',
+  floppy: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 4h13l3 3v13H4Z"/><rect x="7.5" y="4" width="7" height="5"/><rect x="7" y="14" width="10" height="6"/></svg>',
+  cardYellow: '<svg viewBox="0 0 24 24" width="1em" height="1em"><rect x="6" y="3" width="12" height="18" rx="2" transform="rotate(8 12 12)" fill="#F7C600" stroke="#8a6a00" stroke-width="1"/></svg>',
+  cardRed: '<svg viewBox="0 0 24 24" width="1em" height="1em"><rect x="6" y="3" width="12" height="18" rx="2" transform="rotate(8 12 12)" fill="#E02424" stroke="#7a0f0f" stroke-width="1"/></svg>',
+  warningTriangle: '<svg viewBox="0 0 24 24" width="1em" height="1em"><path d="M12 3.5 21.5 20h-19Z" fill="#F0A400" stroke="#5C3D0E" stroke-width="1" stroke-linejoin="round"/><line x1="12" y1="9.5" x2="12" y2="14" stroke="#5C3D0E" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="16.8" r="0.9" fill="#5C3D0E"/></svg>',
+  // pin colorato (rosso fisso, convenzione "pin di mappa"): DIVERSO da "pin" (sopra,
+  // monocromo, già usato come EVENT_ICON.generale) — qui il colore resta leggibile
+  // sul pulsante del link mappe/navigazione, scelta esplicita di Jacopo rispetto
+  // all'alternativa monocroma.
+  mapPin: '<svg viewBox="0 0 24 24" width="1em" height="1em"><path d="M12 21s7-7.5 7-12a7 7 0 1 0-14 0c0 4.5 7 12 7 12Z" fill="#E02424" stroke="#7a0f0f" stroke-width="1"/><circle cx="12" cy="9" r="2.2" fill="#fff"/></svg>',
+  // "assist" nelle statistiche partita/raggruppamento: scarpetta da calcio, Google
+  // Material Symbols "shoe_cleats" (fonts.google.com/icons, licenza Apache 2.0) —
+  // path ORIGINALE del designer, non modificato: solo fill fisso al posto del nero
+  // di default (#1f1f1f -> #6B7A70), stesso principio delle altre icone a colore
+  // fisso qui sopra. Nessun contorno aggiunto: il dettaglio (tacchetti, lacci) è
+  // già tutto nel path stesso.
+  assist: '<svg viewBox="0 -960 960 960" width="1em" height="1em" fill="#6B7A70"><path d="M222-79q-32 0-61.5-12T108-127l-7-7q-9-8-11.5-20t2.5-23l194-495q8-20 27.5-30.5T354-708l58 11q17 4 32.5-2.5T471-717q14-15 18.5-31.5T489-782l-5-15q-5-16-1.5-32.5T498-858l43-43q17-18 42.5-18t42.5 17l181 184q22 23 22.5 54.5T809-609l19 19q6 7 10.5 14.5T843-560q0 7-3 14t-11 15q-12 11-28.5 11.5T772-531l-18-19-28 29 18 18q11 11 11 28t-11 28q-12 11-28.5 11.5T687-447l-18-17-112 114 17 16q12 12 12 28.5T574-277q-12 11-28.5 11.5T517-277l-16-17-28 29 16 16q11 11 11 28t-11 28q-12 11-28.5 11.5T432-193l-16-15-28 28 16 15q11 12 11 28.5T404-108q-12 11-28.5 11.5T347-108l-16-16q-23 23-50.5 34T222-79Zm-57-283q5-11 8-19.5l3-8.5-22 56 3.5-8.5Q161-351 165-362Zm39-100q5-11 8-19.5l3-8.5-22 56 3.5-8.5Q200-451 204-462Zm39-100q5-11 8-19l3-8-22 55 3.5-8.5Q239-551 243-562Zm-21 402q17 0 31.5-6t25.5-18l471-478-166-169-20 20q12 40 4.5 78T528-662q-26 26-60 38.5t-71 4.5l-41-8-25 61 23 8q11 5 16 16t1 22q-4 12-15 18t-23 1l-24-9-17 44 19 7q11 5 16.5 16t1.5 22q-4 12-15.5 17.5t-23.5.5l-20-7-17 44 16 6q11 5 16 15.5t1 21.5q-4 12-15.5 18t-23.5 1l-16-6-54 136q10 7 21.5 10.5T222-160Zm242-336Z"/></svg>',
 };
 function icon(name){ return ICONS[name] || ''; }
 function fabHtml(action, label, extraAttrs){
@@ -860,10 +923,16 @@ const EVENT_LABEL = { allenamento:'Allenamento', partita:'Partita', raggruppamen
 /* =========================================================
    PANNELLI INFO (ⓘ)
    ========================================================= */
+// Condivisa tra home_stagioni (schermata "Stagioni") e home_stagioni_squadre
+// (schermata "Squadre" di una stagione): stesso contenuto introduttivo, solo
+// il paragrafo finale differisce perché il menu "⋯" fa una cosa diversa nelle
+// due schermate (elimina la stagione nella prima, la squadra nella seconda).
+const HOME_STAGIONI_INTRO = `<p><strong>Come funziona:</strong> Una stagione (es. "2025/26") è un contenitore. Al suo interno crei le tue squadre, e dentro ogni squadra registri calendario, presenze e partite. Tocca una squadra per entrarci.</p>`;
 const INFO_TEXTS = {
   calendario: {
     title: 'Come funziona il calendario',
-    body: `<p>Tocca un giorno per registrare o consultare un impegno: Allenamento, Partita, Raggruppamento o Impegno generale. Le celle con impegni già in programma hanno uno sfondo verde chiaro e mostrano l'icona dell'evento. 🎂 indica il compleanno di un giocatore.</p>
+    body: `<p>Tocca un giorno per registrare o consultare un impegno: Allenamento, Partita, Raggruppamento o Impegno generale. Le celle con impegni già in programma hanno uno sfondo verde chiaro e mostrano l'icona dell'evento. L'icona 🎂 indica il compleanno di un giocatore.</p>
+    <p><strong>L'anello dorato:</strong> se vedi un anello dorato intorno a un'icona, è un promemoria per avvisarti che le presenze di quell'impegno non sono ancora state confermate. Per farlo sparire, ti basta aprire l'impegno e toccare "Salva" (anche senza modificare i dati).</p>
     <p>Tocca il nome del mese per saltare velocemente a un altro mese o anno. La lista "Prossimi impegni" ti mostra i 5 eventi più imminenti.</p>`
   },
   allenamento_presenze: {
@@ -895,15 +964,18 @@ const INFO_TEXTS = {
     <p>Puoi usare una sola vista, entrambe o nessuna delle due. In fondo troverai anche uno spazio per una nota libera sulla giornata.</p>`
   },
   raggruppamento_dettagliata: {
-    title: 'Campi avanzati (assist)',
-    body: `<p>Attivando questo interruttore compare anche il campo Assist per ogni giocatore nella Vista squadra — utile per i tornei giornalieri dei più grandi.</p>
+    title: 'Campi avanzati (assist, cartellini)',
+    body: `<p>Attivando questo interruttore compaiono anche i campi Assist e Cartellini per ogni giocatore nella Vista squadra — utile per i tornei giornalieri dei più grandi.</p>
     <p>Puoi accenderlo o spegnerlo quando vuoi, anche su un singolo raggruppamento: i dati già inseriti non vengono mai persi.</p>`
   },
   home_stagioni: {
     title: 'Stagioni e squadre',
-    body: `<p><strong>Come funziona:</strong> Una stagione (es. "2025/26") è un contenitore. Al suo interno crei le tue squadre, e dentro ogni squadra registri calendario, presenze e partite. Tocca una squadra per entrarci.</p>
-    <p><strong>Squadra principale (☆/★):</strong> La stellina imposta la tua squadra principale. I suoi impegni e i compleanni appariranno per primi nelle notifiche 🔔. Puoi avere una sola squadra principale alla volta: per cambiarla, togli prima la stella da quella attuale.</p>
-    <p><strong>Eliminare una stagione:</strong> Dal menu con i tre puntini "⋯" puoi rinominare o eliminare stagioni e squadre. Attenzione: eliminando una stagione cancelli le squadre al suo interno (con il relativo calendario), ma i giocatori resteranno salvi nell'Anagrafica generale.</p>`
+    body: HOME_STAGIONI_INTRO + `<p><strong>Eliminare una stagione:</strong> Dal menu con i tre puntini "⋯" puoi rinominare o eliminare stagioni e squadre. Attenzione: eliminando una stagione cancelli le squadre al suo interno (con il relativo calendario), ma i giocatori resteranno salvi nell'Anagrafica generale.</p>`
+  },
+  home_stagioni_squadre: {
+    title: 'Stagioni e squadre',
+    body: HOME_STAGIONI_INTRO + `<p><strong>Squadra principale:</strong> La stellina imposta la tua squadra principale. I suoi impegni e i compleanni appariranno per primi nelle notifiche (l'icona della campanella in alto a destra). Puoi averne solo una alla volta: per cambiarla, devi togliere prima la stella da quella attuale.</p>
+    <p><strong>Rinominare o eliminare una squadra:</strong> dal menu con i tre puntini "⋯" puoi rinominare o eliminare questa squadra. Attenzione: eliminandola cancelli anche il suo calendario, ma i giocatori resteranno salvi nell'Anagrafica generale.</p>`
   },
   home_anagrafica: {
     title: 'Anagrafica generale',
@@ -987,12 +1059,19 @@ const INFO_TEXTS = {
     title: "Installare l'app sul dispositivo",
     body: `<p><strong>Importante:</strong> l'app funziona sempre al 100% offline. I tuoi dati restano esclusivamente sul tuo dispositivo nel pieno rispetto della privacy.</p>
     <ul style="margin:0 0 10px;padding-left:20px;">
-      <li><strong>iPhone/iPad</strong>: apri il file con Safari → tocca l'icona di condivisione ⬆️ in basso → scegli "Aggiungi a Home". Otterrai un'icona a schermo intero identica a un'app vera.</li>
-      <li><strong>Android</strong>: apri il file con Chrome → tocca i tre puntini ⋮ in alto a destra → "Aggiungi a schermata Home". L'app funzionerà subito (potrebbe solo restare visibile la barra in alto, è normale).</li>
-      <li><strong>PC (Chrome o Edge)</strong>: apri il menu ⋮ in alto a destra → "Cast, salva e condividi" (o "Altri strumenti") → "Crea scorciatoia..." → spunta "Apri come finestra" → conferma. Avrai la tua app sul desktop.</li>
+      <li><strong>iPhone/iPad</strong>: apri il file con Safari → tocca l'icona di condivisione (il quadrato con la freccia verso l'alto) in basso → scegli "Aggiungi a Home". Otterrai un'icona a schermo intero identica a un'app vera.</li>
+      <li><strong>Android</strong>: apri il file con Chrome → tocca i tre puntini verticali ⋮ in alto a destra → "Aggiungi a schermata Home". L'app funzionerà subito (potrebbe solo restare visibile la barra in alto, è normale).</li>
+      <li><strong>PC (Chrome)</strong>: apri il menu con i tre puntini verticali ⋮ in alto a destra → "Cast, salva e condividi" → "Crea scorciatoia..." → spunta "Apri come finestra" → conferma. Avrai la tua app sul desktop.</li>
+      <li><strong>PC (Edge)</strong>: apri il menu con i tre puntini orizzontali ⋯ in alto a destra → "App" → "Installa il sito come un'app" → confermi il nome → "Installa". L'app si apre già nella sua finestra, senza bisogno di spuntare nulla.</li>
     </ul>
-    <p>⚠️ <strong>Backup</strong>: poiché i dati restano solo sul telefono/PC dove usi l'app, usa l'apposita funzione di backup (l'icona con le due frecce circolari, in alto a destra) per salvarli al sicuro o per trasferirli su un altro dispositivo.</p>
-    <p><strong>Quando ricevi una versione aggiornata</strong>: installa la nuova icona, importa il tuo backup, e verifica che i dati ci siano tutti — solo a quel punto elimina l'icona vecchia (tienila premuta → Rimuovi/Elimina). Il telefono non distingue automaticamente due icone con lo stesso nome: se le lasci entrambe, rischi di aprire per sbaglio quella vecchia.</p>`
+    <p>${icon('warningTriangle')} <strong>Backup</strong>: poiché i dati restano solo sul telefono/PC dove usi l'app, usa l'apposita funzione di backup (l'icona con le due frecce circolari, in alto a destra) per salvarli al sicuro o per trasferirli su un altro dispositivo.</p>
+    <p>Quando è disponibile una nuova versione, l'app ti mostrerà l'avviso "Aggiornamento disponibile". Potrai scegliere tra:</p>
+    <ul style="margin:0 0 10px;padding-left:20px;">
+      <li><strong>"Aggiorna"</strong>: per installarla subito. I tuoi dati restano esattamente dove sono, e un piccolo avviso in basso ti confermerà l'avvenuto aggiornamento.</li>
+      <li><strong>"Fai un backup prima"</strong>: se preferisci fare una copia di sicurezza prima di procedere, per stare più tranquillo.</li>
+      <li><strong>"Più tardi"</strong>: per rimandare e farlo con calma.</li>
+    </ul>
+    <p><strong>E se chiudi l'app senza toccare nulla?</strong> Non preoccuparti, è impossibile "scordarsi" di aggiornare. Se ignori l'avviso e chiudi del tutto l'app, la prossima volta che la riaprirai l'aggiornamento si installerà da solo in automatico, senza che tu debba fare nulla.</p>`
   },
 };
 
@@ -1175,12 +1254,17 @@ function validaBackup(d){
    normalizza=true (loadState): i campi opzionali fuori formato vengono ripuliti sul posto
    (data/orario/durata/link -> null, numeri -> 0, stato -> 'NP'); id e date degli impegni
    NON si possono ripulire (sono chiavi di collegamento e di ordinamento) e restano
-   problemi. Non guarda nomi, note e testo libero: quelli passano già da escapeHtml. */
+   problemi. Di nomi, note e testo libero NON controlla i caratteri (passano già da escapeHtml)
+   ma ne limita la LUNGHEZZA, prima di qualunque regex o confronto su quei testi (F21):
+   troppo lungo = file rifiutato in import; in loadState il testo viene troncato (un link
+   troppo lungo si azzera: un URL troncato non funzionerebbe). Soglie: LIMITI_DATI. */
 const RE_ID_DATI = /^[A-Za-z0-9_-]{1,64}$/;
 const RE_DATA_DATI = /^\d{4}-\d{2}-\d{2}$/;
 const RE_ORARIO_DATI = /^([01]\d|2[0-3]):[0-5]\d$/;
 const RE_LINK_DATI = /^https?:\/\/[^\s"'<>]+$/i;
 const STATI_DATI = ['', 'P', 'R', 'A', 'NC', 'NP'];
+// Lunghezze massime (caratteri). Nessun nome/nota reale le supera.
+const LIMITI_DATI = { persona:50, nome:100, nota:5000, risultato:20, link:2048 };
 // Dominio con eventuale percorso, senza schema (es. "goo.gl/x"): il form permette di salvare
 // un link così, quindi un backup legittimo può contenerne.
 const RE_DOMINIO_DATI = /^[A-Za-z0-9.-]+\.[A-Za-z]{2,}(\/[^\s"'<>]*)?$/;
@@ -1191,6 +1275,7 @@ function normalizzaLinkMaps(d){
   if(d===null || typeof d!=='object' || !Array.isArray(d.events)) return;
   d.events.forEach(e => {
     if(e===null || typeof e!=='object' || typeof e.mapsLink!=='string') return;
+    if(e.mapsLink.length > LIMITI_DATI.link) return;   // troppo lungo: nessuna regex, lo giudica controllaCampiDati
     const t = e.mapsLink.trim();
     if(RE_LINK_DATI.test(t)) e.mapsLink = t;
     else if(RE_DOMINIO_DATI.test(t)) e.mapsLink = 'https://' + t;
@@ -1205,7 +1290,7 @@ function controllaCampiDati(d, normalizza){
   const isIdOVuoto = v => v==='' || isId(v);
   const isData = v => v==='' || str(RE_DATA_DATI, v);
   const isOrario = v => str(RE_ORARIO_DATI, v);
-  const isLink = v => v==='' || str(RE_LINK_DATI, v);
+  const isLink = v => v==='' || (typeof v==='string' && v.length<=LIMITI_DATI.link && RE_LINK_DATI.test(v));
   const isNum = v => typeof v==='number' && Number.isFinite(v);
   const isStato = v => STATI_DATI.indexOf(v) >= 0;
   const campo = (o, k, ok, path, fb, nullable) => {
@@ -1213,23 +1298,49 @@ function controllaCampiDati(d, normalizza){
     if(v===undefined || (v===null && nullable!==false) || ok(v)) return;
     if(normalizza && fb!==NO){ o[k] = fb; normalizzati++; } else problemi.push(path + '.' + k);
   };
+  // testo libero: solo la lunghezza. Import: file rifiutato. loadState: troncato (senza spezzare
+  // una coppia di surrogati, es. un'emoji).
+  const testo = (o, k, max, path) => {
+    const v = o[k];
+    if(typeof v!=='string' || v.length<=max) return;
+    if(normalizza){
+      let fine = max;
+      const c = v.charCodeAt(fine - 1);
+      if(c>=0xD800 && c<=0xDBFF) fine--;
+      o[k] = v.slice(0, fine); normalizzati++;
+    } else problemi.push(path + '.' + k + ' (troppo lungo)');
+  };
   const oggetto = x => x!==null && typeof x==='object' && !Array.isArray(x);
   const lista = k => Array.isArray(d[k]) ? d[k].filter(oggetto) : [];
   campo(d, 'primaryTeamId', isId, 'primaryTeamId', NO);
-  lista('seasons').forEach((s, i) => campo(s, 'id', isId, 'seasons[' + i + ']', NO));
-  lista('teams').forEach((t, i) => { const p = 'teams[' + i + ']'; campo(t, 'id', isId, p, NO); campo(t, 'seasonId', isId, p, NO); });
-  lista('players').forEach((x, i) => { const p = 'players[' + i + ']'; campo(x, 'id', isId, p, NO); campo(x, 'dataNascita', isData, p, null); });
+  testo(d, 'userName', LIMITI_DATI.nome, 'userName'); testo(d, 'clubName', LIMITI_DATI.nome, 'clubName');
+  lista('seasons').forEach((s, i) => { const p = 'seasons[' + i + ']'; campo(s, 'id', isId, p, NO); testo(s, 'nome', LIMITI_DATI.nome, p); });
+  lista('teams').forEach((t, i) => { const p = 'teams[' + i + ']'; campo(t, 'id', isId, p, NO); campo(t, 'seasonId', isId, p, NO); testo(t, 'nome', LIMITI_DATI.nome, p); });
+  lista('players').forEach((x, i) => {
+    const p = 'players[' + i + ']'; campo(x, 'id', isId, p, NO); campo(x, 'dataNascita', isData, p, null);
+    ['nome', 'cognome', 'soprannome'].forEach(k => testo(x, k, LIMITI_DATI.persona, p));
+    ['cardNote', 'homeCardNote'].forEach(k => testo(x, k, LIMITI_DATI.nota, p));
+  });
   lista('assignments').forEach((a, i) => {
     const p = 'assignments[' + i + ']';
     campo(a, 'id', isId, p, NO); campo(a, 'teamId', isId, p, NO); campo(a, 'playerId', isId, p, NO);
     campo(a, 'dataIngresso', isData, p, null); campo(a, 'dataUscita', isData, p, null);
   });
-  lista('tournaments').forEach((t, i) => { const p = 'tournaments[' + i + ']'; campo(t, 'id', isId, p, NO); campo(t, 'teamId', isId, p, NO); });
+  lista('tournaments').forEach((t, i) => {
+    const p = 'tournaments[' + i + ']'; campo(t, 'id', isId, p, NO); campo(t, 'teamId', isId, p, NO);
+    testo(t, 'nome', LIMITI_DATI.nome, p); testo(t, 'regole', LIMITI_DATI.nota, p);
+  });
   lista('events').forEach((e, i) => {
     const p = 'events[' + i + ']';
     campo(e, 'id', isId, p, NO); campo(e, 'teamId', isId, p, NO); campo(e, 'date', isData, p, NO, false);
     campo(e, 'torneoId', isIdOVuoto, p, NO);
     campo(e, 'orario', isOrario, p, null); campo(e, 'durata', isNum, p, null); campo(e, 'mapsLink', isLink, p, null);
+    ['avversario', 'label', 'titolo'].forEach(k => testo(e, k, LIMITI_DATI.nome, p));
+    testo(e, 'note', LIMITI_DATI.nota, p);
+    if(Array.isArray(e.miniPartite)) e.miniPartite.filter(oggetto).forEach((mm, j) => {
+      const q = p + '.miniPartite[' + j + ']';
+      testo(mm, 'avversario', LIMITI_DATI.nome, q); testo(mm, 'risultato', LIMITI_DATI.risultato, q); testo(mm, 'note', LIMITI_DATI.nota, q);
+    });
     if(oggetto(e.presenze)) Object.keys(e.presenze).forEach(pid => {
       if(!isId(pid)) problemi.push(p + '.presenze[chiave]');
       else campo(e.presenze, pid, isStato, p + '.presenze', 'NP', false);
@@ -1425,7 +1536,7 @@ function scriviStato(){
 function performSave(){
   saveDirty = false;
   if(!scriviStato()){
-    showAlert('Impossibile salvare: lo spazio del browser potrebbe essere pieno. Esporta un backup per non perdere i dati inseriti finora.');
+    showAlert('Impossibile salvare: lo spazio del browser potrebbe essere pieno. Esporta un backup per non perdere i dati inseriti finora.', 'errore');
   }
 }
 function saveState(){
@@ -1754,10 +1865,18 @@ function findTeamNameConflict(tid, nome, seasonId){
 // Separa un nome nel testo che precede l'ultimo gruppo di cifre e il gruppo
 // stesso (es. "Piccoli amici 2020" -> {testo:"piccoli amici", numero:"2020"}).
 // Nomi che non terminano con un numero restano fuori da questo controllo.
+// Scansione da destra (lineare): la regex /^(.*?)(\d+)\s*$/ era quadratica su nomi lunghi
+// fatti di sole cifre seguite da un carattere (F21). Stesso risultato, compreso il caso dei
+// nomi con "a capo" prima del numero: "." non attraversa \n \r \u2028 \u2029, quindi lì
+// la regex non combaciava e restituiva null.
 function splitTrailingNumber(nome){
-  const m = /^(.*?)(\d+)\s*$/.exec((nome||'').trim());
-  if(!m) return null;
-  return { testo: m[1].trim().toLowerCase().replace(/\s+/g,' '), numero: m[2] };
+  const s = (nome||'').trim();
+  let j = s.length;
+  while(j > 0 && s[j-1] >= '0' && s[j-1] <= '9') j--;
+  if(j === s.length) return null;                          // niente cifre in coda
+  const prefisso = s.slice(0, j);
+  if(/[\n\r\u2028\u2029]/.test(prefisso)) return null;     // come "." nella regex
+  return { testo: prefisso.trim().toLowerCase().replace(/\s+/g,' '), numero: s.slice(j) };
 }
 // Avviso NON bloccante (a differenza di findTeamNameConflict): nome squadra
 // che sembra la stessa cosa di un'altra già esistente nella stessa stagione,
@@ -2083,7 +2202,7 @@ function renderHomeDashboard(){
     <div class="card" style="display:flex;align-items:center;gap:10px;">
       <div style="flex:1;">
         <div class="section-title" style="margin-bottom:2px;">${greetingLine()}</div>
-        <div class="muted">🕓 Dati aggiornati il: ${escapeHtml(updatedLabel)}</div>
+        <div class="muted">${icon('clock')} Dati aggiornati il: ${escapeHtml(updatedLabel)}</div>
       </div>
       <button class="btn ghost sm" style="font-size:24px;" data-action="open-set-name" title="Cambia nome">${icon('pencil')}</button>
     </div>
@@ -2100,6 +2219,10 @@ function renderHomeDashboard(){
       <button class="tile" data-action="nav-stats-generali">
         <span class="tile-icon">${icon('chartbar')}</span>
         <span class="tile-text"><span class="tile-label">Statistiche e scheda generali</span><span class="tile-sub">Dati multi-squadra</span></span>
+      </button>
+      <button class="tile" data-action="open-vetrina">
+        <span class="tile-icon">${icon('compass')}</span>
+        <span class="tile-text"><span class="tile-label">Guida rapida</span><span class="tile-sub">Scorciatoie e funzioni nascoste</span></span>
       </button>
     </div>
   `;
@@ -2139,7 +2262,7 @@ function renderSeasonTeamsScreen(){
   const teams = teamsOfSeason(season.id);
   return `
     <div class="card">
-      <div class="section-title">Squadre — ${escapeHtml(season.nome)} ${infoIcon('home_stagioni')}</div>
+      <div class="section-title">Squadre — ${escapeHtml(season.nome)} ${infoIcon('home_stagioni_squadre')}</div>
       ${teams.length===0? '<p class="muted">Nessuna squadra in questa stagione.</p>':''}
       ${teams.map(t=>{
         const isPrimary = t.id===STATE.primaryTeamId;
@@ -2202,7 +2325,7 @@ function renderAnagraficaScreen(){
 
       <div class="search-bar">
         <span class="search-icon">${icon('search')}</span>
-        <input type="text" placeholder="Cerca giocatore..." data-action="anagrafica-search" value="${escapeHtml(UI.anagraficaSearch)}">
+        <input type="text" placeholder="Cerca giocatore..." data-action="anagrafica-search" autocomplete="off" value="${escapeHtml(UI.anagraficaSearch)}">
       </div>
       <div class="filter-chips">
         <button type="button" class="chip ${UI.anagraficaFilter==='tutti'?'active':''}" data-action="anagrafica-filter" data-filter="tutti">Tutti</button>
@@ -2290,7 +2413,7 @@ function renderSquadraView(team){
       <div class="section-title">Rosa attuale (${rosterCount}) ${infoIcon('squadra_rosa')}</div>
       <div class="search-bar">
         <span class="search-icon">${icon('search')}</span>
-        <input type="text" placeholder="Cerca giocatore..." data-action="roster-search" value="${escapeHtml(UI.rosterSearch)}">
+        <input type="text" placeholder="Cerca giocatore..." data-action="roster-search" autocomplete="off" value="${escapeHtml(UI.rosterSearch)}">
       </div>
       <div class="sort-row">
         <label>Ordina</label>
@@ -2338,7 +2461,7 @@ function renderStatsGeneraliScreen(){
         </div>
       </div>
       <div class="field"><label>Nota (facoltativa, specifica per questo giocatore)</label>
-        <textarea data-action="home-card-note-input" data-pid="${player.id}" placeholder="Nota per la scheda generale">${escapeHtml(player.homeCardNote||'')}</textarea>
+        <textarea data-action="home-card-note-input" maxlength="5000" data-pid="${player.id}" placeholder="Nota per la scheda generale">${escapeHtml(player.homeCardNote||'')}</textarea>
       </div>
       <button class="btn block" data-action="print-home-card">Stampa / Esporta PDF scheda generale</button>
     `;
@@ -2440,7 +2563,7 @@ function renderSchedaView(team){
         <button type="button" class="btn ghost sm" style="margin-top:8px;" data-action="save-card-fields-default">Imposta come predefinito per questa squadra</button>
       </div>
       <div class="field"><label>Nota (facoltativa, specifica per questo giocatore)</label>
-        <textarea data-action="card-note-input" data-pid="${player.id}" placeholder="es. il mese di settembre non è conteggiato...">${escapeHtml(player.cardNote||'')}</textarea>
+        <textarea data-action="card-note-input" maxlength="5000" data-pid="${player.id}" placeholder="es. il mese di settembre non è conteggiato...">${escapeHtml(player.cardNote||'')}</textarea>
       </div>
     </div>
 
@@ -2522,7 +2645,7 @@ function buildPrintCardHtml({eyebrow, name, sub, fields, stats, note}){
 // disegna solo #popup-zone e lascia intatto tutto il resto.
 function cannotPrintWithoutName(player){
   if(fullName(player)) return false;
-  showAlert('Questo giocatore non ha né nome né cognome: completa il nome prima di stampare la scheda.');
+  showAlert('Questo giocatore non ha né nome né cognome: completa il nome prima di stampare la scheda.', 'attenzione');
   return true;
 }
 
@@ -2667,6 +2790,10 @@ const TESTO_IMPORT_ILLEGGIBILE = "Non è stato possibile leggere il file. Non è
 const TESTO_IMPORT_FALLITO = "L'importazione non è riuscita. I tuoi dati sono stati lasciati come prima. Riprova con un altro file di backup.";
 const TESTO_IMPORT_SPAZIO = "Non c'è abbastanza spazio per importare il backup. Non è stato cambiato niente.";
 const TESTO_IMPORT_RIPRISTINO_FALLITO = "Qualcosa non ha funzionato nel mostrare i dati. I tuoi dati non sono stati cambiati. Chiudi e riapri l'app.";
+// Tetto sulla dimensione del file di backup: un backup vero pesa poche centinaia di KB
+// (il file di prova con 168 giocatori pesa ~290 KB). Oltre, si rifiuta PRIMA di leggerlo
+// e di farne il JSON.parse. Stesso avviso degli altri file non validi.
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 // Campi di UI che dipendono dai dati (id di stagioni, giocatori, tornei…): dopo un import
 // puntano a cose che non esistono più. Vanno riportati a questi valori. seasonId resta vuoto
@@ -2776,7 +2903,7 @@ function eseguiImport(nuovo, scartati){
     const vecchiaUI = {};
     Object.keys(UI_DOPO_IMPORT).forEach(k => { vecchiaUI[k] = UI[k]; });
     clearTimeout(saveTimer); saveDirty = false;
-    const fallito = testo => showAlert(ripristinaDopoImport(vecchioSTATE, vecchiaUI) ? testo : TESTO_IMPORT_RIPRISTINO_FALLITO);
+    const fallito = testo => showAlert(ripristinaDopoImport(vecchioSTATE, vecchiaUI) ? testo : TESTO_IMPORT_RIPRISTINO_FALLITO, 'errore');
     try{
       STATE = nuovo; window.STATE = nuovo;
       Object.assign(UI, UI_DOPO_IMPORT);           // Home, nessuna stagione scelta, id vecchi azzerati, modale chiuso
@@ -2788,27 +2915,28 @@ function eseguiImport(nuovo, scartati){
     if(!scriviStato()){ fallito(TESTO_IMPORT_SPAZIO); return; }
     // riuscito: la selezione ricordata non deve puntare ai vecchi id
     saveLastSelection({seasonId:null, teamId:null});
-    showAlert(messaggioImportato(nuovo, scartati));
+    showAlert(messaggioImportato(nuovo, scartati), 'conferma');
   }finally{
     historyRelease({apiObbligatoria:true});
   }
 }
 
 function importBackupFile(file){
+  if(file && file.size > MAX_FILE_BYTES){ showAlert(TESTO_IMPORT_NON_BACKUP, 'errore'); return; }
   const reader = new FileReader();
-  reader.onerror = () => { showAlert(TESTO_IMPORT_ILLEGGIBILE); };
+  reader.onerror = () => { showAlert(TESTO_IMPORT_ILLEGGIBILE, 'errore'); };
   reader.onload = (evt) => {
     let nuovo, dataBackup, scartati;
     try{
       const grezzo = JSON.parse(evt.target.result);
       normalizzaLinkMaps(grezzo);   // mapsLink senza schema: aggiunge https:// invece di rifiutare il file
-      if(!validaBackup(grezzo).ok){ showAlert(TESTO_IMPORT_NON_BACKUP); return; }
+      if(!validaBackup(grezzo).ok){ showAlert(TESTO_IMPORT_NON_BACKUP, 'errore'); return; }
       const data = migrateState(grezzo);
       dataBackup = data.meta && data.meta.updatedAt;
       nuovo = costruisciStatoImport(data);
       scartati = rimuoviGiocatoriNomeNonValido(nuovo);
     }catch(err){
-      showAlert(TESTO_IMPORT_NON_BACKUP); return;
+      showAlert(TESTO_IMPORT_NON_BACKUP, 'errore'); return;
     }
     // telefono senza dati: niente da perdere, nessuna conferma (flusso "importa il tuo backup")
     if(!hasAnyData()){ eseguiImport(nuovo, scartati); return; }
@@ -2819,7 +2947,7 @@ function importBackupFile(file){
     );
   };
   try{ reader.readAsText(file); }
-  catch(err){ showAlert(TESTO_IMPORT_ILLEGGIBILE); }
+  catch(err){ showAlert(TESTO_IMPORT_ILLEGGIBILE, 'errore'); }
 }
 
 function modalBackup(){
@@ -2827,12 +2955,12 @@ function modalBackup(){
   const lastActionLabel = STATE.meta && STATE.meta.lastAction ? STATE.meta.lastAction : null;
   // promemoria backup: calcolato all'apertura del modale
   const rem = backupReminder();
-  const reminderLine = rem ? `<div class="banner" id="backup-reminder-line" style="margin:0 0 14px;">💾 ${escapeHtml(backupReminderText(rem))}</div>` : '';
+  const reminderLine = rem ? `<div class="banner" id="backup-reminder-line" style="margin:0 0 14px;">${icon('floppy')} ${escapeHtml(backupReminderText(rem))}</div>` : '';
   return `
     <div class="modal-head"><h2>Backup e ripristino</h2><button data-action="close-modal">${icon('close')}</button></div>
     <div class="modal-scroll-body">
     <p class="muted">I dati della squadra sono salvati solo su questo telefono, dentro l'app. Il backup ti permette di tenerli al sicuro o di trasferirli su un nuovo telefono. Attenzione: se cancelli i dati del browser (in particolare "cookie e dati dei siti"), possono sparire anche i dati dell'app. Prima di pulire il telefono o il browser, fai un backup.</p>
-    <div class="banner" style="margin:0 0 14px;">🕓 Dati di questo dispositivo aggiornati il: <strong>&nbsp;${escapeHtml(updatedLabel)}</strong>${lastActionLabel? `<br><span style="font-size:13px;font-weight:400;">Ultima azione: ${escapeHtml(lastActionLabel)}</span>`:''}</div>
+    <div class="banner" style="margin:0 0 14px;">${icon('clock')} Dati di questo dispositivo aggiornati il: <strong>&nbsp;${escapeHtml(updatedLabel)}</strong>${lastActionLabel? `<br><span style="font-size:13px;font-weight:400;">Ultima azione: ${escapeHtml(lastActionLabel)}</span>`:''}</div>
     ${reminderLine}
     <button class="btn block" data-action="export-backup">Esporta backup (.json)</button>
     <p class="muted" style="margin-top:8px;">Il file ha un nome con la data e l'ora dell'esportazione (per esempio Backup-Touchline-2026-09-20-1530.json): se esporti di nuovo, i backup precedenti restano dove sono e ne viene creato uno nuovo. Se vuoi scegliere sempre tu dove salvarlo, imposta il tuo browser su "Chiedi sempre dove salvare i file" nelle sue impostazioni. Una volta salvato il file, mandalo a te stesso (email o WhatsApp) o copialo su Google Drive: così puoi recuperare la stagione se cambi telefono o perdi i dati.</p>
@@ -2841,7 +2969,7 @@ function modalBackup(){
       Importa backup (.json)
       <input type="file" accept="application/json" data-action="import-backup-file" style="display:none;">
     </label>
-    <p class="muted">⚠️ Importare un backup sostituisce tutti i dati presenti ora su questo dispositivo. Prima di procedere l'app ti mostra cosa c'è nel backup e cosa c'è sul telefono, e ti segnala se il backup è più vecchio.</p>
+    <p class="muted">${icon('warningTriangle')} Importare un backup sostituisce tutti i dati presenti ora su questo dispositivo. Prima di procedere l'app ti mostra cosa c'è nel backup e cosa c'è sul telefono, e ti segnala se il backup è più vecchio.</p>
     <p class="muted" style="margin-top:8px;font-size:12px;">Versione app: ${escapeHtml(APP_VERSION)}</p>
     </div>
   `;
@@ -3255,10 +3383,10 @@ function modalSetName(){
     ${isFirstRun? `<p class="muted">Lo useremo per salutarti quando apri l'app. Puoi cambiarlo quando vuoi dalla Home.</p>`:''}
     <form data-form="set-name">
       <div class="field"><label>Nome o nickname</label>
-        <input type="text" name="nome" value="${STATE.userName?escapeHtml(STATE.userName):''}" placeholder="es. Leonardo">
+        <input type="text" name="nome" maxlength="100" autocomplete="off" value="${STATE.userName?escapeHtml(STATE.userName):''}" placeholder="es. Leonardo">
       </div>
       <div class="field"><label>Nome società/club (facoltativo)</label>
-        <input type="text" name="club" value="${STATE.clubName?escapeHtml(STATE.clubName):''}" placeholder="es. A.S.D Squadra">
+        <input type="text" name="club" maxlength="100" autocomplete="off" value="${STATE.clubName?escapeHtml(STATE.clubName):''}" placeholder="es. A.S.D Squadra">
       </div>
       <button type="submit" class="btn block">Salva</button>
     </form>
@@ -3316,7 +3444,7 @@ function andamentoBodyHtml(player, team, tab, expanded){
       .sort((a,b)=>b.date.localeCompare(a.date));
     rowHtml = e=>{
       const g = (e.giocatori||{})[player.id];
-      const extra = g && g.stato==='P' ? `<div class="sub">⚽ ${g.gol||0}${g.assist?` · 🎯 ${g.assist}`:''}${g.giallo?` · 🟨 ${g.giallo}`:''}${g.rosso?' · 🟥':''}</div>` : '';
+      const extra = g && g.stato==='P' ? `<div class="sub">${icon('ball')} ${g.gol||0}${g.assist?` · ${icon('assist')} ${g.assist}`:''}${g.giallo?` · ${icon('cardYellow')} ${g.giallo}`:''}${g.rosso?` · ${icon('cardRed')}`:''}</div>` : '';
       return `
       <div class="list-item">
         <div class="name-stack">
@@ -3332,7 +3460,7 @@ function andamentoBodyHtml(player, team, tab, expanded){
       .sort((a,b)=>b.date.localeCompare(a.date));
     rowHtml = e=>{
       const g = (e.squadra||{})[player.id];
-      const extra = g && g.stato==='P' ? `<div class="sub">⚽ ${g.gol||0}${g.assist?` · 🎯 ${g.assist}`:''}${g.giallo?` · 🟨 ${g.giallo}`:''}${g.rosso?' · 🟥':''}</div>` : '';
+      const extra = g && g.stato==='P' ? `<div class="sub">${icon('ball')} ${g.gol||0}${g.assist?` · ${icon('assist')} ${g.assist}`:''}${g.giallo?` · ${icon('cardYellow')} ${g.giallo}`:''}${g.rosso?` · ${icon('cardRed')}`:''}</div>` : '';
       return `
       <div class="list-item">
         <div class="name-stack">
@@ -3351,6 +3479,74 @@ function andamentoBodyHtml(player, team, tab, expanded){
     body += `<button class="btn ghost sm" data-action="andamento-toggle-expand" data-tab="${tab}">${expanded? 'Mostra solo i recenti' : `Mostra tutti (${totale})`}</button>`;
   }
   return body;
+}
+function vetrinaCardHtml(iconName, bodyHtml){
+  return `<div class="card" style="margin-bottom:10px;padding:14px;">
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <span style="font-size:20px;line-height:1;color:var(--pitch-deep);flex-shrink:0;">${icon(iconName)}</span>
+      ${bodyHtml}
+    </div>
+  </div>`;
+}
+function vetrinaBodyHtml(tab){
+  const cardAggiornamenti = vetrinaCardHtml('sync', '<p style="margin:0;"><strong>Aggiornamenti</strong>: quando è disponibile una nuova versione, l\'app te lo segnala da sola. Se non tocchi nulla, non devi preoccuparti di dimenticartene: la prossima volta che chiudi del tutto l\'app e la riapri, l\'aggiornamento è già pronto da solo.</p>');
+  const cardCsv = vetrinaCardHtml('chartbar', '<p style="margin:0;"><strong>Esportare le statistiche</strong>: in Statistiche, il pulsante "Esporta CSV" salva i dati in un file apribile con un foglio di calcolo.</p>');
+  const cardCartellino = vetrinaCardHtml('redcard', '<p style="margin:0;"><strong>Cartellino rosso automatico</strong>: nella scheda Partita, se segni 2 ammonizioni per lo stesso giocatore il rosso si spunta da solo (e si toglie se il conteggio torna sotto 2). Se però lo tocchi tu a mano anche una sola volta, da lì in poi l\'automatismo per quel giocatore resta disattivato.</p>');
+  const cardRisultato = vetrinaCardHtml('pencil', '<p style="margin:0;"><strong>Campo «Risultato»</strong>: nelle mini-partite scrivi il punteggio come preferisci ("3:2", "3 a 2"...): l\'app tiene solo i due numeri e li ricompone con un trattino ("3-2") mentre digiti.</p>');
+  const cardEsito = vetrinaCardHtml('flag', '<p style="margin:0;"><strong>Esito automatico</strong>: appena il Risultato ha la forma "numero-numero", accanto compare da sola l\'etichetta Vittoria/Sconfitta/Pareggio.</p>');
+  const cardStagioni = vetrinaCardHtml('calendar', '<p style="margin:0;"><strong>Nomi di stagione equivalenti</strong>: "26/27", "26-27" e "2026-27" sono trattati come la stessa stagione: non puoi crearne una con un nome che differisce solo per questo formato da una già esistente.</p>');
+  const cardToast = vetrinaCardHtml('sync', '<p style="margin:0;"><strong>Chiudere l\'avviso di aggiornamento</strong>: il messaggio "App aggiornata" sparisce da solo dopo 6 secondi, ma puoi anche toccarlo per farlo sparire subito.</p>');
+  if(tab==='pc'){
+    return vetrinaCardHtml('keyboard', `<div style="min-width:0;">
+        <p style="margin:0 0 6px;"><strong>Scorciatoie da tastiera</strong></p>
+        <ul style="margin:0;padding-left:20px;">
+          <li><strong>Freccia sinistra / destra</strong>: cambia mese nel calendario.</li>
+          <li><strong>"N"</strong>: apre subito un nuovo impegno per il giorno corrente, nel calendario.</li>
+          <li><strong>"/"</strong>: porta il cursore sulla casella di ricerca (rosa o anagrafica).</li>
+          <li><strong>Esc</strong>: chiude il popup o la schermata aperta.</li>
+        </ul>
+        <p class="muted" style="margin-top:6px;">Funzionano solo quando non stai scrivendo in un campo di testo.</p>
+      </div>`)
+      + vetrinaCardHtml('doorExit', '<p style="margin:0;"><strong>Uscire dall\'app</strong>: dalla Home, premi Alt+Freccia sinistra (o il tasto "Indietro" del browser) due volte per uscire: la prima volta è solo un avviso, la seconda esce davvero.</p>')
+      + cardAggiornamenti
+      + cardCsv
+      + cardCartellino
+      + cardRisultato
+      + cardEsito
+      + cardStagioni
+      + cardToast;
+  }
+  const cardScorrereMesi = `<div class="card" style="margin-bottom:10px;padding:14px;">
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <span style="font-size:20px;line-height:1;color:var(--pitch-deep);flex-shrink:0;display:flex;">${icon('chevronLeft')}${icon('chevronRight')}</span>
+      <p style="margin:0;"><strong>Scorrere i mesi</strong>: scorri con il dito sul calendario per cambiare mese, senza toccare le freccette.</p>
+    </div>
+  </div>`;
+  const cardPodio = vetrinaCardHtml('podium', '<p style="margin:0;"><strong>Classifica marcatori di un torneo</strong>: in Tornei, l\'icona a forma di podio su una riga porta subito alla classifica marcatori di quel torneo, già filtrata e ordinata per gol.</p>');
+  return cardScorrereMesi
+    + vetrinaCardHtml('bolt', '<p style="margin:0;"><strong>Apertura rapida di un giorno</strong>: se un giorno ha un solo impegno, tienilo premuto per aprirlo subito in modifica, senza passare dall\'elenco.</p>')
+    + vetrinaCardHtml('doorExit', '<p style="margin:0;"><strong>Uscire dall\'app</strong>: dalla Home, premi "Indietro" due volte per uscire: la prima volta è solo un avviso, la seconda esce davvero.</p>')
+    + cardAggiornamenti
+    + cardCsv
+    + cardPodio
+    + cardCartellino
+    + cardRisultato
+    + cardEsito
+    + cardStagioni
+    + cardToast;
+}
+function modalVetrina(){
+  const tab = (UI.modal.payload && UI.modal.payload.tab) || 'telefono';
+  return `
+    <div class="modal-head"><h2 style="position:relative;top:-8px;">Guida rapida</h2><button data-action="close-modal">${icon('close')}</button></div>
+    <div class="modal-scroll-body">
+      <div class="seg" style="margin-bottom:12px;">
+        <button data-action="vetrina-tab" data-tab="telefono" class="${tab==='telefono'?'active':''}">Telefono</button>
+        <button data-action="vetrina-tab" data-tab="pc" class="${tab==='pc'?'active':''}">Computer</button>
+      </div>
+      <div id="vetrina-body">${vetrinaBodyHtml(tab)}</div>
+    </div>
+  `;
 }
 function modalPlayerAndamento(){
   const p = UI.modal.payload;
@@ -3395,7 +3591,7 @@ function modalSeasonManager(){
     <div class="divider"></div>
     <form data-form="new-season">
       <div class="field"><label>Nome nuova stagione</label>
-        <input type="text" name="nome" placeholder="es. 26/27" required>
+        <input type="text" name="nome" maxlength="100" autocomplete="off" placeholder="es. 26/27" required>
       </div>
       <button type="submit" class="btn block">Crea stagione</button>
     </form>
@@ -3423,7 +3619,7 @@ function modalTeamManager(){
     ${season? `
     <form data-form="new-team" data-sid="${season.id}">
       <div class="field"><label>Nome nuova squadra</label>
-        <input type="text" name="nome" placeholder="es. Primi Calci 2017" required>
+        <input type="text" name="nome" maxlength="100" autocomplete="off" placeholder="es. Primi Calci 2017" required>
         <div class="muted" id="team-name-similar-hint" style="margin-top:4px;"></div>
       </div>
       <button type="submit" class="btn block">Crea squadra</button>
@@ -3442,7 +3638,7 @@ function modalEditSeason(){
     <div class="modal-head"><h2>Rinomina stagione</h2><button data-action="close-modal">${icon('close')}</button></div>
     <form data-form="rename-season" data-sid="${s.id}">
       <div class="field"><label>Nome stagione</label>
-        <input type="text" name="nome" value="${escapeHtml(s.nome)}" required>
+        <input type="text" name="nome" maxlength="100" autocomplete="off" value="${escapeHtml(s.nome)}" required>
       </div>
       <button type="submit" class="btn block">Salva</button>
     </form>
@@ -3469,7 +3665,7 @@ function modalEditTeam(){
     <div class="modal-head"><h2>Rinomina squadra</h2><button data-action="close-modal">${icon('close')}</button></div>
     <form data-form="rename-team" data-tid="${t.id}">
       <div class="field"><label>Nome squadra</label>
-        <input type="text" name="nome" value="${escapeHtml(t.nome)}" required>
+        <input type="text" name="nome" maxlength="100" autocomplete="off" value="${escapeHtml(t.nome)}" required>
         <div class="muted" id="team-name-similar-hint" style="margin-top:4px;"></div>
       </div>
       <button type="submit" class="btn block">Salva</button>
@@ -3511,10 +3707,10 @@ function modalEditPlayer(){
     <div class="modal-scroll-body">
     <form data-form="save-player" data-pid="${pid||''}" data-forteam="${forTeam?'1':''}">
       <div class="row2">
-        <div class="field"><label>Nome</label><input type="text" name="nome" value="${escapeHtml(nomeV)}" required>
+        <div class="field"><label>Nome</label><input type="text" name="nome" maxlength="50" autocomplete="off" value="${escapeHtml(nomeV)}" required>
           <div class="field-error" id="player-nome-error" style="display:${erroreVisibile(nomeV)};">Solo lettere, spazi, apostrofi e trattini.</div>
         </div>
-        <div class="field"><label>Cognome</label><input type="text" name="cognome" value="${escapeHtml(cognomeV)}">
+        <div class="field"><label>Cognome</label><input type="text" name="cognome" maxlength="50" autocomplete="off" value="${escapeHtml(cognomeV)}">
           <div class="field-error" id="player-cognome-error" style="display:${erroreVisibile(cognomeV)};">Solo lettere, spazi, apostrofi e trattini.</div>
         </div>
       </div>
@@ -3522,7 +3718,7 @@ function modalEditPlayer(){
         <input type="date" name="dataNascita" value="${pl?pl.dataNascita||'':''}">
       </div>
       <div class="field"><label>Come lo chiami (facoltativo) ${infoIcon('soprannome')}</label>
-        <input type="text" name="soprannome" value="${escapeHtml(soprannomeV)}" placeholder="es. il nome con cui lo riconosci in campo">
+        <input type="text" name="soprannome" maxlength="50" autocomplete="off" value="${escapeHtml(soprannomeV)}" placeholder="es. il nome con cui lo riconosci in campo">
         <div class="field-error" id="player-soprannome-error" style="display:${erroreVisibile(soprannomeV)};">Solo lettere, spazi, apostrofi e trattini.</div>
       </div>
       <button type="submit" class="btn block"${salvaDisabilitato?' disabled':''}>Salva</button>
@@ -3568,7 +3764,7 @@ function modalAddExistingPlayer(){
     <div class="modal-scroll-body">
       <div class="search-bar">
         <span class="search-icon">${icon('search')}</span>
-        <input type="text" placeholder="Cerca giocatore..." data-action="add-existing-player-search" value="${escapeHtml(UI.addExistingPlayerSearch||'')}">
+        <input type="text" placeholder="Cerca giocatore..." data-action="add-existing-player-search" autocomplete="off" value="${escapeHtml(UI.addExistingPlayerSearch||'')}">
       </div>
       <div id="add-existing-player-list">${addExistingPlayerListHtml(available)}</div>
     </div>
@@ -3631,7 +3827,7 @@ function modalEditTournament(){
   const t = tid ? STATE.tournaments.find(x=>x.id===tid) : null;
   const team = currentTeam();
   const claimWarning = (t && !t.teamId && team)
-    ? `<p class="muted" style="margin:0 0 14px;">⚠️ Questo torneo non è ancora assegnato a una squadra. Salvando, verrà assegnato a <strong>${escapeHtml(team.nome)}</strong>.</p>`
+    ? `<p class="muted" style="margin:0 0 14px;">${icon('warningTriangle')} Questo torneo non è ancora assegnato a una squadra. Salvando, verrà assegnato a <strong>${escapeHtml(team.nome)}</strong>.</p>`
     : '';
   return `
     <div class="modal-head"><h2>${t?'Modifica torneo':'Nuovo torneo'}</h2><button data-action="close-modal">${icon('close')}</button></div>
@@ -3639,10 +3835,10 @@ function modalEditTournament(){
     ${claimWarning}
     <form data-form="save-tournament" data-tid="${tid||''}">
       <div class="field"><label>Nome torneo</label>
-        <input type="text" name="nome" value="${t?escapeHtml(t.nome):''}" required placeholder="es. Torneo NomeTorneo">
+        <input type="text" name="nome" maxlength="100" autocomplete="off" value="${t?escapeHtml(t.nome):''}" required placeholder="es. Torneo NomeTorneo">
       </div>
       <div class="field"><label>Regole (facoltativo)</label>
-        <textarea name="regole" placeholder="es. 2 tempi da 20 minuti">${t?escapeHtml(t.regole||''):''}</textarea>
+        <textarea name="regole" maxlength="5000" placeholder="es. 2 tempi da 20 minuti">${t?escapeHtml(t.regole||''):''}</textarea>
       </div>
       <button type="submit" class="btn block">Salva torneo</button>
     </form>
@@ -3874,7 +4070,7 @@ function cleanReload(reloadFn){
   reloadFn = reloadFn || function(){ location.reload(); };
   if(saveDirty){
     clearTimeout(saveTimer); saveDirty = false;
-    if(!scriviStato()){ saveDirty = true; showAlert(TESTO_AGGIORNA_NON_SALVATO); return false; }
+    if(!scriviStato()){ saveDirty = true; showAlert(TESTO_AGGIORNA_NON_SALVATO, 'errore'); return false; }
   }
   histReloading = true;
   // sync sospesa fino al ricarico: la schermata è ancora aperta e, appena il go() arriva, la sync
@@ -3993,9 +4189,7 @@ function mostraAvvisoIndietro(testo){
   el.setAttribute('role', 'status');
   el.setAttribute('aria-live', 'polite');
   el.textContent = testo;
-  el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(28px + env(safe-area-inset-bottom, 0px));' +
-    'max-width:88vw;padding:12px 20px;border-radius:24px;background:rgba(20,30,25,.94);color:#fff;font-size:15px;' +
-    'text-align:center;z-index:90;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.3);';
+  el.className = 'exit-toast';
   document.body.appendChild(el);
 }
 function scheduleGuardRearm(){
@@ -4076,8 +4270,8 @@ function apriPopup(obj){
   UI.popup = obj;
   renderPopup();
 }
-function showAlert(message){
-  apriPopup({kind:'alert', message});
+function showAlert(message, tone){
+  apriPopup({kind:'alert', message, tone: tone || 'attenzione'});
 }
 function showConfirm(message, onConfirm, opts){
   opts = opts || {};
@@ -4126,6 +4320,9 @@ function renderPopup(){
       <div class="modal modal-split" data-stop="1">${infoPanelHtml(INFO_TEXTS[p.key], 'close-popup')}</div>
     </div>`;
   } else {
+    // tono visivo SOLO per kind==='alert': showConfirm non ha un "tono" (è sempre una domanda
+    // neutra con due pulsanti), quindi non prende mai una classe alert-*.
+    const toneClass = p.kind==='alert' ? ` alert-${p.tone}` : '';
     const confirmBtn = p.kind==='confirm'
       ? `<button class="btn ${p.danger?'danger':''}" style="flex:1;" data-action="confirm-popup">${escapeHtml(p.confirmLabel)}</button>`
       : '';
@@ -4133,7 +4330,7 @@ function renderPopup(){
       ? `<button class="btn secondary" style="flex:1;" data-action="close-popup">Annulla</button>`
       : `<button class="btn block" data-action="close-popup">OK</button>`;
     zone.innerHTML = `<div class="overlay" data-action="overlay-close-popup">
-      <div class="modal" data-stop="1">
+      <div class="modal${toneClass}" data-stop="1">
         <p style="white-space:pre-wrap;margin:0 0 16px;">${escapeHtml(p.message)}</p>
         <div style="display:flex;gap:8px;">${cancelBtn}${confirmBtn}</div>
       </div>
@@ -4205,6 +4402,7 @@ function renderModal(){
     case 'jump-month': inner = modalJumpMonth(); break;
     case 'notifiche': inner = modalNotifiche(); break;
     case 'player-andamento': inner = modalPlayerAndamento(); break;
+    case 'vetrina': inner = modalVetrina(); break;
     case 'set-name': inner = modalSetName(); break;
     case 'info-tip': inner = modalInfoTip(); break;
     default: inner = '';
@@ -4220,7 +4418,7 @@ function renderModal(){
   // eliminazione: un campo o una frase, non superano mai 90vh).
   const SPLIT_MODAL_TYPES = [
     'player-andamento','partita','allenamento','raggruppamento','event-detail','add-existing-player','jump-month',
-    'info','backup','season-manager','team-manager','notifiche','edit-tournament','generale','day','edit-player'
+    'info','backup','season-manager','team-manager','notifiche','edit-tournament','generale','day','edit-player','vetrina'
   ];
   const modalClass = SPLIT_MODAL_TYPES.includes(UI.modal.type) ? 'modal modal-split' : 'modal';
   // Modali con campi da compilare: il tocco sullo sfondo non li chiude, per non perdere
@@ -4249,11 +4447,11 @@ function modalDay(){
       const overlap = evs.find(o=>o.id!==e.id && eventiSiSovrappongono(e,o));
       const overlapExtra = overlap && overlap.type==='partita' ? ` vs ${overlap.avversario||'?'}` : (overlap && overlap.type==='generale' ? ` "${overlap.titolo||''}"` : '');
       const overlapLabel = overlap ? `${EVENT_LABEL[overlap.type]}${overlapExtra} (${overlap.orario})` : '';
-      const warnHtml = overlap ? `<button type="button" class="warn-tri" data-action="show-overlap-warning" data-label="${escapeHtml(overlapLabel)}">⚠️</button>` : '';
+      const warnHtml = overlap ? `<button type="button" class="warn-tri" data-action="show-overlap-warning" data-label="${escapeHtml(overlapLabel)}">${icon('warningTriangle')}</button>` : '';
       return `
       <div class="list-item" data-action="view-event" data-eventid="${e.id}" style="cursor:pointer;">
         <span style="font-size:20px;" class="${e.type!=='generale' && e.confermato===false ? 'da-confermare' : ''}">${EVENT_ICON[e.type]}</span>
-        <div class="name-stack"><div class="name">${EVENT_LABEL[e.type]}${e.note? ' 📝':''}</div><div class="sub">${eventSummary(e)}</div></div>
+        <div class="name-stack"><div class="name">${EVENT_LABEL[e.type]}${e.note? ' '+icon('note'):''}</div><div class="sub">${eventSummary(e)}</div></div>
         ${warnHtml}
         <span class="spacer"></span>
         <button type="button" class="delete-icon-btn" data-action="delete-event" data-eventid="${e.id}" title="Elimina" aria-label="Elimina">${icon('trash')}</button>
@@ -4416,7 +4614,7 @@ function modalEventDetail(){
   } else if(e.type==='partita'){
     rows = roster.map(r=>{
       const g = (e.giocatori||{})[r.player.id];
-      const extra = g && g.stato==='P' ? `<span class="muted" style="margin-left:8px;">⚽ ${g.gol||0}${g.assist?` · 🎯 ${g.assist}`:''}${g.giallo?` · 🟨 ${g.giallo}`:''}${g.rosso?` · 🟥`:''}</span>` : '';
+      const extra = g && g.stato==='P' ? `<span class="muted" style="margin-left:8px;">${icon('ball')} ${g.gol||0}${g.assist?` · ${icon('assist')} ${g.assist}`:''}${g.giallo?` · ${icon('cardYellow')} ${g.giallo}`:''}${g.rosso?` · ${icon('cardRed')}`:''}</span>` : '';
       return `
       <div class="list-item">
         <div class="avatar">${initials(r.player)}</div>
@@ -4427,7 +4625,7 @@ function modalEventDetail(){
   } else if(e.type==='raggruppamento'){
     rows = roster.map(r=>{
       const g = (e.squadra||{})[r.player.id];
-      const extra = g && g.stato==='P' && (g.gol || g.assist) ? `<span class="muted" style="margin-left:8px;">${g.gol?`⚽ ${g.gol}`:''}${g.gol && g.assist?' · ':''}${g.assist?`🎯 ${g.assist}`:''}</span>` : '';
+      const extra = g && g.stato==='P' && (g.gol || g.assist) ? `<span class="muted" style="margin-left:8px;">${g.gol?`${icon('ball')} ${g.gol}`:''}${g.gol && g.assist?' · ':''}${g.assist?`${icon('assist')} ${g.assist}`:''}</span>` : '';
       return `
       <div class="list-item">
         <div class="avatar">${initials(r.player)}</div>
@@ -4450,7 +4648,7 @@ function modalEventDetail(){
     <div class="modal-scroll-body">
       ${header? `<p class="muted">${header}</p>`:''}
       ${e.orario? `<div class="detail-section"><div class="detail-row"><span>Orario</span><strong>${escapeHtml(e.orario)}${e.durata?` (${e.durata} min)`:''}</strong></div></div>` : ''}
-      ${e.mapsLink && !schemaLinkPericoloso(e.mapsLink)? `<a href="${escapeHtml(e.mapsLink)}" target="_blank" rel="noopener" class="btn secondary sm" style="text-decoration:none;margin-bottom:10px;">📍 Apri la posizione</a>` : ''}
+      ${e.mapsLink && !schemaLinkPericoloso(e.mapsLink)? `<a href="${escapeHtml(e.mapsLink)}" target="_blank" rel="noopener" class="btn secondary sm" style="text-decoration:none;margin-bottom:10px;">${icon('mapPin')} Apri la posizione</a>` : ''}
       ${rows? `
       <button type="button" class="btn secondary block" data-action="toggle-presenze-list" data-target="event-detail-presenze">Mostra presenze</button>
       <div id="event-detail-presenze" class="collapsible-section">${rows}</div>` : ''}
@@ -4495,13 +4693,13 @@ function modalRaggruppamento(){
     <div class="modal-scroll-body">
     <form data-form="raggruppamento" data-date="${date}" data-eventid="${p.eventId||''}">
       <div class="field"><label>Etichetta</label>
-        <input type="text" data-draft="label" value="${escapeHtml(draft.label)}">
+        <input type="text" data-draft="label" maxlength="100" value="${escapeHtml(draft.label)}">
       </div>
       <div class="field"><label>Torneo collegato (opzionale)</label>
         ${customFieldSelect('torneoId-draft', draft.torneoId||'', [['','— nessuno —'], ...STATE.tournaments.filter(t=>t.teamId===UI.teamId).map(t=>[t.id, t.nome])])}
       </div>
       <div class="toggle-row">
-        <span style="font-size:13px;font-weight:600;">Mostra campi avanzati (assist) ${infoIcon('raggruppamento_dettagliata')}</span>
+        <span style="font-size:13px;font-weight:600;">Mostra campi avanzati (assist, cartellini) ${infoIcon('raggruppamento_dettagliata')}</span>
         <button type="button" class="switch ${draft.dettagliata?'on':''}" data-action="toggle-raggruppamento-dettagliata"><span class="knob"></span></button>
       </div>
       <div class="divider"></div>
@@ -4514,7 +4712,7 @@ function modalRaggruppamento(){
       <div id="presenze-list-raggruppamento" class="collapsible-section">
         ${roster.length===0? `<p class="muted">Nessun giocatore risulta in squadra a questa data.</p>` : ''}
         ${roster.map(r=>{
-          const g = draft.squadra[r.player.id] || {stato:'P', gol:0, assist:0};
+          const g = draft.squadra[r.player.id] || {stato:'P', gol:0, assist:0, giallo:0, rosso:false};
           const stato = g.stato || 'P';
           return `
           <div class="list-item" style="align-items:flex-start;">
@@ -4528,6 +4726,12 @@ function modalRaggruppamento(){
                 </span>
                 <span class="rg-assist-field" style="display:${draft.dettagliata?'flex':'none'};align-items:center;gap:6px;font-size:12px;">Assist
                   ${stepperHtmlRgAssist(r.player.id, g.assist)}
+                </span>
+                <span class="rg-assist-field" style="display:${draft.dettagliata?'flex':'none'};align-items:center;gap:6px;font-size:12px;">${icon('cardYellow')}
+                  ${stepperHtml('giallo', r.player.id, g.giallo, 'max="2"')}
+                </span>
+                <span class="rg-assist-field" style="display:${draft.dettagliata?'flex':'none'};align-items:center;gap:5px;font-size:12px;">
+                  <input type="checkbox" data-role="rosso" data-pid="${r.player.id}" ${g.rosso?'checked':''}> ${icon('cardRed')}
                 </span>
               </div>
             </div>
@@ -4548,7 +4752,7 @@ function modalRaggruppamento(){
 
       <div class="divider"></div>
       <div class="field"><label>Note dell'intera giornata (facoltative)</label>
-        <textarea data-draft="note" placeholder="Annotazioni sul raggruppamento...">${escapeHtml(draft.note||'')}</textarea>
+        <textarea data-draft="note" maxlength="5000" placeholder="Annotazioni sul raggruppamento...">${escapeHtml(draft.note||'')}</textarea>
       </div>
       <button type="submit" class="btn block">Salva raggruppamento</button>
     </form>
@@ -4559,13 +4763,13 @@ function minimatchRowHtml(mm, i){
   mm = mm || {avversario:'', risultato:'', note:''};
   return `<div class="minimatch-row" data-minimatch-row="${i}">
     <div class="row2">
-      <div class="field" style="margin-bottom:6px;"><label>Avversario</label><input type="text" data-mm="avversario" data-idx="${i}" value="${escapeHtml(mm.avversario)}"></div>
+      <div class="field" style="margin-bottom:6px;"><label>Avversario</label><input type="text" data-mm="avversario" maxlength="100" data-idx="${i}" value="${escapeHtml(mm.avversario)}"></div>
       <div class="field" style="margin-bottom:6px;"><label>Risultato (tua squadra - avversario)</label>
-        <input type="text" inputmode="numeric" data-mm="risultato" data-idx="${i}" value="${escapeHtml(mm.risultato)}">
+        <input type="text" inputmode="numeric" data-mm="risultato" maxlength="20" data-idx="${i}" value="${escapeHtml(mm.risultato)}">
         <div class="mm-esito" data-mm-esito="${i}" style="margin-top:4px;">${minimatchEsitoHtml(mm.risultato)}</div>
       </div>
     </div>
-    <div class="field" style="margin-bottom:6px;"><label>Note (es. gol di...)</label><input type="text" data-mm="note" data-idx="${i}" value="${escapeHtml(mm.note)}"></div>
+    <div class="field" style="margin-bottom:6px;"><label>Note (es. gol di...)</label><input type="text" data-mm="note" maxlength="5000" data-idx="${i}" value="${escapeHtml(mm.note)}"></div>
     <button type="button" class="btn ghost sm" data-action="remove-minimatch" data-idx="${i}">Rimuovi mini-partita</button>
   </div>`;
 }
@@ -4593,12 +4797,31 @@ function minimatchWarnHtml(draft, roster){
   const sommaSquadra = roster.reduce((s,r)=> s + Number((draft.squadra[r.player.id]||{}).gol||0), 0);
   const sommaMini = draft.miniPartite.reduce((s,mm)=> s + (parseFirstScore(mm.risultato)||0), 0);
   const showWarn = draft.miniPartite.length>0 && Object.keys(draft.squadra).length>0 && sommaSquadra!==sommaMini;
-  return showWarn? `<span class="warn-tri" data-action="show-info" data-infokey="raggruppamento_warning" title="Il totale gol qui (${sommaSquadra}) non coincide con il totale delle mini-partite (${sommaMini})">⚠️ ${sommaSquadra} vs ${sommaMini}</span>` : '';
+  return showWarn? `<span class="warn-tri" data-action="show-info" data-infokey="raggruppamento_warning" title="Il totale gol qui (${sommaSquadra}) non coincide con il totale delle mini-partite (${sommaMini})">${icon('warningTriangle')} ${sommaSquadra} vs ${sommaMini}</span>` : '';
 }
+// Scansione lineare: la regex /(\d+)\s*[-:]\s*(\d+)/, non ancorata, riprovava da ogni cifra
+// e con una lunga serie di sole cifre era quadratica. Stesso risultato: la prima serie
+// massimale di cifre seguita da spazi, un "-" o ":" , altri spazi e una cifra; restituisce
+// quella serie come numero (0 se non c'è).
 function parseFirstScore(risultato){
   if(!risultato) return 0;
-  const m = String(risultato).match(/(\d+)\s*[-:]\s*(\d+)/);
-  return m ? Number(m[1]) : 0;
+  const s = String(risultato);
+  const cifra = c => c >= '0' && c <= '9';
+  const spazio = c => /\s/.test(c);
+  let i = 0;
+  while(i < s.length){
+    if(!cifra(s[i])){ i++; continue; }
+    const inizio = i;
+    while(i < s.length && cifra(s[i])) i++;
+    let j = i;
+    while(j < s.length && spazio(s[j])) j++;
+    if(j < s.length && (s[j] === '-' || s[j] === ':')){
+      j++;
+      while(j < s.length && spazio(s[j])) j++;
+      if(j < s.length && cifra(s[j])) return Number(s.slice(inizio, i));
+    }
+  }
+  return 0;
 }
 
 /* =========================================================
@@ -4644,7 +4867,7 @@ function modalAllenamento(){
         <input type="number" name="durata" min="0" step="5" placeholder="es. 90" value="${existing?(existing.durata||''):''}">
       </div>
       <div class="field"><label>Note (facoltative)</label>
-        <textarea name="note" placeholder="Annotazioni su questo allenamento...">${existing?escapeHtml(existing.note||''):''}</textarea>
+        <textarea name="note" maxlength="5000" placeholder="Annotazioni su questo allenamento...">${existing?escapeHtml(existing.note||''):''}</textarea>
       </div>
       <button type="submit" class="btn block">Salva allenamento</button>
     </form>
@@ -4665,7 +4888,7 @@ function modalImpegnoGenerale(){
     <div class="modal-scroll-body">
     <form data-form="generale" data-date="${date}" data-eventid="${existing?existing.id:''}">
       <div class="field"><label>Titolo</label>
-        <input type="text" name="titolo" value="${existing?escapeHtml(existing.titolo||''):''}" placeholder="es. Riunione genitori" required>
+        <input type="text" name="titolo" maxlength="100" autocomplete="off" value="${existing?escapeHtml(existing.titolo||''):''}" placeholder="es. Riunione genitori" required>
       </div>
       <div class="row2">
         <div class="field"><label>Ora</label>
@@ -4676,7 +4899,7 @@ function modalImpegnoGenerale(){
         </div>
       </div>
       <div class="field"><label>Note (facoltative)</label>
-        <textarea name="note" placeholder="Annotazioni su questo impegno...">${existing?escapeHtml(existing.note||''):''}</textarea>
+        <textarea name="note" maxlength="5000" placeholder="Annotazioni su questo impegno...">${existing?escapeHtml(existing.note||''):''}</textarea>
       </div>
       <button type="submit" class="btn block">Salva impegno</button>
     </form>
@@ -4704,7 +4927,7 @@ function modalPartita(){
     <div class="modal-scroll-body">
     <form data-form="partita" data-date="${date}" data-eventid="${existing?existing.id:''}">
       <div class="field"><label>Avversario</label>
-        <input type="text" name="avversario" value="${existing?escapeHtml(existing.avversario||''):''}" placeholder="Nome squadra avversaria">
+        <input type="text" name="avversario" maxlength="100" autocomplete="off" value="${existing?escapeHtml(existing.avversario||''):''}" placeholder="Nome squadra avversaria">
       </div>
       <div class="row2">
         <div class="field"><label>Sede</label>
@@ -4719,7 +4942,7 @@ function modalPartita(){
         <input type="text" name="mapsLink" value="${existing?(existing.mapsLink||''):''}"
           placeholder="Incolla qui il link della posizione">
         <div class="muted" id="maps-link-warning" style="display:none;margin-top:4px;">
-          ⚠️ Non sembra un link di mappe/navigazione riconosciuto — verrà
+          ${icon('warningTriangle')} Non sembra un link di mappe/navigazione riconosciuto — verrà
           comunque salvato così come l'hai scritto.
         </div>
       </div>
@@ -4752,11 +4975,11 @@ function modalPartita(){
                 <label class="assist-field" style="display:${detailed?'flex':'none'};align-items:center;gap:6px;font-size:12px;">Assist
                   ${stepperHtml('assist', r.player.id, g.assist)}
                 </label>
-                <label class="assist-field" style="display:${detailed?'flex':'none'};align-items:center;gap:6px;font-size:12px;">🟨
+                <label class="assist-field" style="display:${detailed?'flex':'none'};align-items:center;gap:6px;font-size:12px;">${icon('cardYellow')}
                   ${stepperHtml('giallo', r.player.id, g.giallo, 'max="2"')}
                 </label>
                 <label class="assist-field" style="display:${detailed?'flex':'none'};align-items:center;gap:5px;font-size:12px;">
-                  <input type="checkbox" data-role="rosso" data-pid="${r.player.id}" ${g.rosso?'checked':''}> 🟥
+                  <input type="checkbox" data-role="rosso" data-pid="${r.player.id}" ${g.rosso?'checked':''}> ${icon('cardRed')}
                 </label>
               </div>
             </div>
@@ -4776,7 +4999,7 @@ function modalPartita(){
         <input type="number" name="durata" min="0" step="5" placeholder="es. 90" value="${existing?(existing.durata||''):''}">
       </div>
       <div class="field"><label>Note (facoltative)</label>
-        <textarea name="note" placeholder="Annotazioni su questa partita...">${existing?escapeHtml(existing.note||''):''}</textarea>
+        <textarea name="note" maxlength="5000" placeholder="Annotazioni su questa partita...">${existing?escapeHtml(existing.note||''):''}</textarea>
       </div>
       <button type="submit" class="btn block">Salva partita</button>
     </form>
@@ -4795,7 +5018,7 @@ function eventDeleteLabel(e){
 }
 
 function eventSummary(e){
-  const orarioPrefix = e.orario ? `🕒 ${e.orario} · ` : '';
+  const orarioPrefix = e.orario ? `${icon('clock')} ${e.orario} · ` : '';
   if(e.type==='allenamento'){
     const vals = Object.values(e.presenze||{});
     const p = vals.filter(v=>v==='P').length, a=vals.filter(v=>v==='A').length, r=vals.filter(v=>v==='R').length;
@@ -5019,24 +5242,6 @@ function applyStepperChange(btn, amount){
   input.dispatchEvent(new Event('input', {bubbles:true}));
   input.dispatchEvent(new Event('change', {bubbles:true}));
 }
-let stepperHoldTimer = null;
-let stepperHoldFired = false;
-document.addEventListener('pointerdown', function(e){
-  const btn = e.target.closest('.stepper-btn');
-  if(!btn) return;
-  stepperHoldFired = false;
-  clearTimeout(stepperHoldTimer);
-  stepperHoldTimer = setTimeout(()=>{
-    stepperHoldFired = true;
-    if(navigator.vibrate) navigator.vibrate(15);
-    applyStepperChange(btn, Number(btn.dataset.stepdir) * 5);
-  }, 2000);
-});
-function clearStepperHoldTimer(){ clearTimeout(stepperHoldTimer); }
-document.addEventListener('pointerup', clearStepperHoldTimer);
-document.addEventListener('pointercancel', clearStepperHoldTimer);
-document.addEventListener('pointerleave', clearStepperHoldTimer, true);
-
 // ---------- Gesture da telefono sul calendario ----------
 // Swipe sinistra/destra sulla griglia: cambia mese.
 let calSwipeStartX = null;
@@ -5252,10 +5457,9 @@ document.addEventListener('click', function(e){
     return;
   }
 
-  // stepper +/- per campi numerici (gol, assist, cartellino giallo) — pressione prolungata (~2s) = ±5
+  // stepper +/- per campi numerici (gol, assist, cartellino giallo)
   const stepBtn = e.target.closest('.stepper-btn');
   if(stepBtn){
-    if(stepperHoldFired){ stepperHoldFired = false; return; } // già applicato il balzo da +5/-5, ignora il click normale
     applyStepperChange(stepBtn, Number(stepBtn.dataset.stepdir));
     return;
   }
@@ -5279,6 +5483,7 @@ document.addEventListener('click', function(e){
     case 'nav-seasons': UI.screen='seasons'; render(); break;
     case 'nav-anagrafica': UI.screen='anagrafica'; render(); break;
     case 'nav-stats-generali': UI.screen='stats-generali'; render(); break;
+    case 'open-vetrina': openModal('vetrina', {tab:'telefono'}); break;
     case 'nav-back': closeTopLayer({senzaGuardia:true}); break;   // stessa funzione del tasto Indietro del telefono (ma "<" non consuma mai la guardia del doppio Indietro)
     case 'open-set-name': openModal('set-name'); break;
     case 'anagrafica-filter': UI.anagraficaFilter = actionEl.dataset.filter; render(); break;
@@ -5303,7 +5508,7 @@ document.addEventListener('click', function(e){
         saveState(); render();
       } else {
         const current = getTeam(STATE.primaryTeamId);
-        showAlert(`Togli prima la stella da "${current?current.nome:'quella attuale'}", poi potrai assegnarla a questa squadra.`);
+        showAlert(`Togli prima la stella da "${current?current.nome:'quella attuale'}", poi potrai assegnarla a questa squadra.`, 'attenzione');
       }
       break;
     }
@@ -5363,6 +5568,17 @@ document.addEventListener('click', function(e){
       break;
     }
     case 'open-player-andamento': openModal('player-andamento', {playerId: actionEl.dataset.pid, teamId: UI.teamId, tab:'allenamenti', expanded:{allenamenti:false, partite:false, raggruppamenti:false}}); break;
+    case 'vetrina-tab': {
+      if(UI.modal){
+        const tab = actionEl.dataset.tab;
+        UI.modal.payload.tab = tab;
+        const seg = actionEl.closest('.seg');
+        if(seg) seg.querySelectorAll('button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+        const bodyEl = document.getElementById('vetrina-body');
+        if(bodyEl) bodyEl.innerHTML = vetrinaBodyHtml(tab);
+      }
+      break;
+    }
     case 'andamento-tab': {
       if(UI.modal){
         const tab = actionEl.dataset.tab;
@@ -5495,7 +5711,7 @@ document.addEventListener('click', function(e){
       const pid = actionEl.dataset.pid;
       const pl = getPlayer(pid);
       const conflict = pl ? findSoprannomeConflict(pid, pl.soprannome, UI.teamId) : null;
-      if(conflict){ showAlert(conflict); break; }
+      if(conflict){ showAlert(conflict, 'attenzione'); break; }
       assignPlayerToTeam(pid, UI.teamId, todayStr());
       closeModal();
       break;
@@ -5507,18 +5723,18 @@ document.addEventListener('click', function(e){
       const dataIngresso = document.getElementById('reassign-date').value;
 
       const conflict = pl ? findSoprannomeConflict(pid, pl.soprannome, UI.teamId) : null;
-      if(conflict){ showAlert(conflict); break; }
+      if(conflict){ showAlert(conflict, 'attenzione'); break; }
 
       const previousAssignments = STATE.assignments.filter(a=>a.playerId===pid && a.teamId===UI.teamId && a.dataUscita);
       const lastDataUscita = previousAssignments.length
         ? previousAssignments.map(a=>a.dataUscita).sort().slice(-1)[0]
         : null;
       if(lastDataUscita && dataIngresso<=lastDataUscita){
-        showAlert(`${pl?displayName(pl):'Il giocatore'} è già stato in questa squadra fino al ${formatIt(lastDataUscita)}. La nuova data di ingresso deve essere successiva a quella data. Correggi la data per procedere.`);
+        showAlert(`${pl?displayName(pl):'Il giocatore'} è già stato in questa squadra fino al ${formatIt(lastDataUscita)}. La nuova data di ingresso deve essere successiva a quella data. Correggi la data per procedere.`, 'attenzione');
         break;
       }
       if(pl && pl.dataNascita && dataIngresso<pl.dataNascita){
-        showAlert(`La data di ingresso (${formatIt(dataIngresso)}) non può essere precedente alla data di nascita di ${displayName(pl)} (${formatIt(pl.dataNascita)}). Correggi la data per procedere.`);
+        showAlert(`La data di ingresso (${formatIt(dataIngresso)}) non può essere precedente alla data di nascita di ${displayName(pl)} (${formatIt(pl.dataNascita)}). Correggi la data per procedere.`, 'attenzione');
         break;
       }
 
@@ -5538,7 +5754,7 @@ document.addEventListener('click', function(e){
       const dataUscita = document.getElementById('remove-date').value;
 
       if(assignment && dataUscita && dataUscita < assignment.dataIngresso){
-        showAlert(`La data di uscita (${formatIt(dataUscita)}) non può essere precedente alla data di ingresso in squadra (${formatIt(assignment.dataIngresso)}). Correggi la data per procedere.`);
+        showAlert(`La data di uscita (${formatIt(dataUscita)}) non può essere precedente alla data di ingresso in squadra (${formatIt(assignment.dataIngresso)}). Correggi la data per procedere.`, 'attenzione');
         break;
       }
 
@@ -5607,7 +5823,7 @@ document.addEventListener('click', function(e){
       if(UI.modal) showInfo(actionEl.dataset.infokey);
       else openModal('info', {key: actionEl.dataset.infokey});
       break;
-    case 'show-overlap-warning': showAlert(`Si sovrappone a: ${actionEl.dataset.label}`); break;
+    case 'show-overlap-warning': showAlert(`Si sovrappone a: ${actionEl.dataset.label}`, 'attenzione'); break;
     case 'export-backup': exportBackup(); break;
     case 'export-stats-csv': exportStatsCsv(); break;
     case 'update-now': {
@@ -5623,7 +5839,7 @@ document.addEventListener('click', function(e){
         // NORMALIZE_TIMEOUT_MS in cleanReload)
         aggiornamentoInCorso = false;
         impostaAggiornamentoInCorsoUI(false);
-        showAlert(TESTO_AGGIORNAMENTO_FALLITO);
+        showAlert(TESTO_AGGIORNAMENTO_FALLITO, 'errore');
       }, AGGIORNAMENTO_TIMEOUT_MS);
       worker.postMessage({type: 'SKIP_WAITING'});
       break;
@@ -5749,6 +5965,15 @@ document.addEventListener('change', function(e){
         rossoBox.dataset.redMode = '';
       }
     }
+    // raggruppamento: stesso principio della sincronizzazione sullo stato P/A/NC/NP
+    // sopra (handler condiviso con partita, un ramo in più per il draft che sopravvive
+    // ai render) — il giallo può aver appena scattato/tolto il rosso automatico qui sopra.
+    if(UI.modal && UI.modal.type==='raggruppamento'){
+      const draft = ensureRaggruppamentoDraft();
+      draft.squadra[pid] = draft.squadra[pid] || {stato:'P', gol:0, assist:0};
+      draft.squadra[pid].giallo = Number(t.value)||0;
+      if(rossoBox) draft.squadra[pid].rosso = rossoBox.checked;
+    }
     return;
   }
   // rosso toccato direttamente dall'utente (spuntato o tolto a mano): da questo
@@ -5756,6 +5981,12 @@ document.addEventListener('change', function(e){
   // sessione di modifica (rosso diretto, o scelta deliberata di non metterlo).
   if(t.dataset.role==='rosso'){
     t.dataset.redMode = 'manual';
+    if(UI.modal && UI.modal.type==='raggruppamento'){
+      const draft = ensureRaggruppamentoDraft();
+      const pid = t.dataset.pid;
+      draft.squadra[pid] = draft.squadra[pid] || {stato:'P', gol:0, assist:0};
+      draft.squadra[pid].rosso = t.checked;
+    }
     return;
   }
 
@@ -5871,7 +6102,7 @@ document.addEventListener('submit', function(e){
     const nome = fv(form,'nome').trim();
     if(!nome) return;
     const conflict = findSeasonNameConflict(null, nome);
-    if(conflict){ showAlert(conflict); return; }
+    if(conflict){ showAlert(conflict, 'attenzione'); return; }
     const s = addSeason(nome);
     UI.seasonId = s.id;
     closeModal();
@@ -5883,7 +6114,7 @@ document.addEventListener('submit', function(e){
     if(!nome) return;
     const sid = form.dataset.sid || UI.seasonId;
     const conflict = findTeamNameConflict(null, nome, sid);
-    if(conflict){ showAlert(conflict); return; }
+    if(conflict){ showAlert(conflict, 'attenzione'); return; }
     const t = addTeam(nome, sid);
     UI.seasonId = sid;
     closeModal();
@@ -5894,7 +6125,7 @@ document.addEventListener('submit', function(e){
     const nome = fv(form,'nome').trim();
     if(!nome) return;
     const conflict = findSeasonNameConflict(form.dataset.sid, nome);
-    if(conflict){ showAlert(conflict); return; }
+    if(conflict){ showAlert(conflict, 'attenzione'); return; }
     renameSeasonData(form.dataset.sid, nome);
     closeModal();
     return;
@@ -5905,7 +6136,7 @@ document.addEventListener('submit', function(e){
     if(!nome) return;
     const team = getTeam(form.dataset.tid);
     const conflict = findTeamNameConflict(form.dataset.tid, nome, team ? team.seasonId : null);
-    if(conflict){ showAlert(conflict); return; }
+    if(conflict){ showAlert(conflict, 'attenzione'); return; }
     renameTeamData(form.dataset.tid, nome);
     closeModal();
     return;
@@ -5929,12 +6160,12 @@ document.addEventListener('submit', function(e){
     // il trim il Nome può risultare vuoto, e la scheda ha bisogno di un nome
     // reale. showAlert non tocca il form, quindi ciò che è stato digitato resta.
     if(!data.nome){
-      showAlert('Il nome del giocatore non può essere vuoto (nemmeno fatto di soli spazi). Scrivi il nome per procedere.');
+      showAlert('Il nome del giocatore non può essere vuoto (nemmeno fatto di soli spazi). Scrivi il nome per procedere.', 'attenzione');
       return;
     }
     const contextTeamId = (!pid && forTeam) ? UI.teamId : undefined;
     const conflict = findPlayerConflict(pid, data, contextTeamId);
-    if(conflict){ showAlert(conflict); return; }
+    if(conflict){ showAlert(conflict, 'attenzione'); return; }
     const pl = savePlayerData(pid, data);
     if(!pid && forTeam){ assignPlayerToTeam(pl.id, UI.teamId, todayStr()); }
     closeModal();
@@ -5949,7 +6180,7 @@ document.addEventListener('submit', function(e){
     const teamId = (existing && existing.teamId) ? existing.teamId : UI.teamId;
     const nome = fv(form,'nome').trim();
     const conflict = findTournamentNameConflict(tid, nome, teamId);
-    if(conflict){ showAlert(conflict); return; }
+    if(conflict){ showAlert(conflict, 'attenzione'); return; }
     saveTournamentData(tid, { nome, regole: fv(form,'regole').trim(), teamId });
     closeModal();
     return;
@@ -6111,7 +6342,7 @@ function modalNotifiche(){
     <div class="modal-scroll-body">
     <p class="muted" style="margin-bottom:10px;">${STATE.primaryTeamId? 'Gli impegni e i compleanni della tua squadra principale compaiono per primi.' : 'Impostane una principale dalla Home per vederla sempre per prima qui.'}</p>
     ${items.map(it=>{
-      const primaryTag = it.teamId===STATE.primaryTeamId ? ' ⭐' : '';
+      const primaryTag = it.teamId===STATE.primaryTeamId ? ' '+icon('starFilled') : '';
       if(it.kind==='birthday'){
         return `<div class="list-item">
           <span style="font-size:20px;">🎂</span>
